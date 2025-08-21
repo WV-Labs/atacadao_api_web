@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Smart - Sistema de Agendamentos</title>
+  <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico?v=1}" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .tv-container {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      max-width: 80%;
+      width: 600px;
+    }
+    .tv-info {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 30px;
+    }
+    .tv-number {
+      font-size: 4rem;
+      font-weight: bold;
+      margin: 10px 0;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    .status-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 10px;
+      animation: pulse 2s infinite;
+    }
+    .status-online { background: #28a745; }
+    .status-offline { background: #dc3545; }
+    .status-scheduled { background: #ffc107; }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    .agendamento-ativo {
+      background: rgba(40, 167, 69, 0.3);
+      border: 2px solid #28a745;
+      padding: 20px;
+      border-radius: 15px;
+      margin: 20px 0;
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { box-shadow: 0 0 10px rgba(40, 167, 69, 0.5); }
+      to { box-shadow: 0 0 20px rgba(40, 167, 69, 0.8); }
+    }
+    .countdown {
+      font-size: 2rem;
+      font-weight: bold;
+      margin: 15px 0;
+    }
+    .log-mini {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+      height: 150px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      text-align: left;
+    }
+    .config-info {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+    .redirect-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .redirect-message {
+      text-align: center;
+      color: white;
+    }
+    .redirect-message h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+    .redirect-countdown {
+      font-size: 5rem;
+      font-weight: bold;
+      color: #ffc107;
+    }
+	.priority-indicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(40, 167, 69, 0.9);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: bold;
+      display: none;
+    }
+    .priority-indicator.show {
+      display: block;
+      animation: priorityPulse 2s infinite;
+    }
+    @keyframes priorityPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }					 
+  </style>
+</head>
+<body>
+<!-- Configuração da TV -->
+<div class="config-info">
+  <div>TV ID: <span id="tv-id">Detectando...</span></div>
+  <div>Categoria: <span id="tv-categoria">Detectando...</span></div>
+  <div>Servidor: <span id="servidor-status">Conectando...</span></div>
+</div>
+
+<!-- Indicador de prioridade -->
+<div id="priority-indicator" class="priority-indicator">
+  🎯 AGENDAMENTO PRIORITÁRIO ATIVO
+</div>
+
+<!-- Overlay de redirecionamento -->
+<div id="redirect-overlay" class="redirect-overlay">
+  <div class="redirect-message">
+    <h1>🎯 Redirecionando para Conteúdo Agendado</h1>
+    <div id="redirect-title"></div>
+    <div class="redirect-countdown" id="redirect-countdown">3</div>
+  </div>
+</div>
+
+<!-- Container principal -->
+<div class="tv-container">
+  <div class="tv-info">
+    <h1>📺 TV Smart</h1>
+    <h2 id="tit_Categoria"></h2>
+    <div class="tv-number" id="numero-terminal">--</div>
+    <div id="nome-categoria">Carregando...</div>
+    <div id="localizacao-terminal">Aguardando dados...</div>
+  </div>
+
+  <div id="status-conexao">
+    <span class="status-indicator status-offline"></span>
+    <span>Conectando ao servidor...</span>
+  </div>
+
+  <div id="agendamento-container">
+    <p>🔍 Verificando agendamentos...</p>
+  </div>
+
+  <div id="proximo-agendamento" style="display: none;">
+    <h3>📅 Próximo Agendamento:</h3>
+    <div id="proximo-info"></div>
+  </div>
+
+  <div class="log-mini" id="log-container"></div>
+</div>
+
+<script>
+  const configIntervalo = /*[[${intervaloVerificacao}]]*/ 30000; //30 segundos
+  const configBaseUrl = /*[[${baseUrl}]]*/ 'http://localhost:8081/api-tv';
+
+  // Configurações da TV
+  let tvConfig = {
+    categoria: null,
+    numero: null,
+    baseUrl: '',
+    checkInterval: configIntervalo,
+    isRedirecting: false
+  };
+
+  let checkInterval = null;
+
+  // Detecta categoria e número da TV pela URL atual
+  function detectarConfigTV() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const categoriaParam = urlParams.get('categoria');
+    const numeroParam = urlParams.get('numero');
+
+    if (categoriaParam && numeroParam) {
+      tvConfig.categoria = categoriaParam;
+      tvConfig.numero = parseInt(numeroParam);
+      adicionarLog(`TV configurada: ${tvConfig.categoria}/${tvConfig.numero}`, 'success');
+    } else {
+      // Valores padrão para demonstração
+      tvConfig.categoria = 'acougue';
+      tvConfig.numero = 1;
+      adicionarLog('Usando configuração padrão para demonstração', 'warning');
+    }
+
+    atualizarInterface();
+  }
+
+  // Atualiza a interface com as informações da TV
+  function atualizarInterface() {
+    document.getElementById('tv-id').textContent = `/api-tv/${tvConfig.categoria}/${tvConfig.numero}`;
+    document.getElementById('tv-categoria').textContent = tvConfig.categoria.toUpperCase();
+    document.getElementById('numero-terminal').textContent = tvConfig.numero;
+    document.getElementById('nome-categoria').textContent = `Setor: ${tvConfig.categoria.charAt(0).toUpperCase() + tvConfig.categoria.slice(1)}`;
+    document.getElementById('localizacao-terminal').textContent = `Terminal ${tvConfig.numero}`;
+  }
+
+  // Adiciona log na interface
+  function adicionarLog(mensagem, tipo = 'info') {
+    const logContainer = document.getElementById('log-container');
+    const timestamp = new Date().toLocaleTimeString('pt-BR');
+    const logEntry = document.createElement('div');
+
+    let icone = 'ℹ️';
+    if (tipo === 'error') icone = '❌';
+    if (tipo === 'success') icone = '✅';
+    if (tipo === 'warning') icone = '⚠️';
+    if (tipo === 'redirect') icone = '🎯';
+	if (tipo === 'priority') icone = '🏆';										
+
+    logEntry.innerHTML = `<span style="opacity: 0.7">[${timestamp}]</span> ${icone} ${mensagem}`;
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+
+    // Mantém apenas as últimas 10 entradas
+    while (logContainer.children.length > 10) {
+      logContainer.removeChild(logContainer.firstChild);
+    }
+  }
+
+  // Verifica agendamentos para esta TV específica
+  async function verificarAgendamentos() {
+    if (tvConfig.isRedirecting) {
+      console.log("🔄 Já está redirecionando, pulando verificação");
+      return;
+    }
+
+    try {
+      console.log("=== 🔍 VERIFICANDO AGENDAMENTOS ===");
+      console.log("TV:", tvConfig.categoria + "/" + tvConfig.numero);
+      console.log("Horário atual:", new Date().toLocaleString('pt-BR'));
+
+      const url = `/api-tv/api/tv/${tvConfig.categoria}/${tvConfig.numero}/status`;
+      document.getElementById('servidor-status').textContent = 'Conectado';
+      console.log("🌐 Chamando URL:", url);
+      const response = await fetch(url);
+      console.log("📡 Response status:", response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const status = await response.json();
+      console.log("📊 Status recebido:", status);
+      console.log("📋 Agendamentos ativos:", status.agendamentosAtivos);
+      console.log("🎯 Deve exibir conteúdo:", status.deveExibirConteudo);
+      console.log("📅 Agendamento atual:", status.agendamentoAtual);
+
+      atualizarStatusConexao(true);
+
+      if (status.deveExibirConteudo && status.agendamentoAtual) {
+        console.log("🚨 AGENDAMENTO ATIVO DETECTADO!");
+        console.log("📌 Título:", status.agendamentoAtual.titulo);
+        console.log("⏰ Início:", status.agendamentoAtual.dataInicio);
+        console.log("⏰ Fim:", status.agendamentoAtual.dataFim);
+
+        // Verifica se é agendamento prioritário (múltiplos ativos)
+        if (status.agendamentosAtivos > 1) {
+          mostrarIndicadorPrioridade();
+          adicionarLog(`Agendamento PRIORITÁRIO detectado: ${status.agendamentoAtual.titulo} (${status.agendamentosAtivos} ativos)`, 'priority');
+        } else {
+          adicionarLog(`Agendamento ativo encontrado: ${status.agendamentoAtual.titulo}`, 'redirect');
+        }
+
+        executarRedirecionamento(status.agendamentoAtual);
+      } else {
+        console.log("📭 Nenhum agendamento ativo no momento");
+        ocultarIndicadorPrioridade();
+
+        document.getElementById('agendamento-container').innerHTML = '<p>📭 Nenhum agendamento ativo para esta TV</p>';
+
+        if (status.proximosAgendamentos && status.proximosAgendamentos.length > 0) {
+          console.log("📅 Próximos agendamentos:", status.proximosAgendamentos.length);
+          mostrarProximoAgendamento(status.proximosAgendamentos[0]);
+        } else {
+          console.log("📅 Nenhum agendamento futuro");
+        }
+      }
+      console.log("=== ✅ VERIFICAÇÃO CONCLUÍDA ===");
+
+    } catch (error) {
+      atualizarStatusConexao(false);
+      adicionarLog(`Erro ao verificar agendamentos: ${error.message}`, 'error');
+      document.getElementById('servidor-status').textContent = 'Desconectado';
+      ocultarIndicadorPrioridade();
+    }
+  }
+
+  // Mostra/oculta indicador de prioridade
+  function mostrarIndicadorPrioridade() {
+    const indicator = document.getElementById('priority-indicator');
+    indicator.classList.add('show');
+  }
+
+  function ocultarIndicadorPrioridade() {
+    const indicator = document.getElementById('priority-indicator');
+    indicator.classList.remove('show');
+  }
+
+  // Atualiza status da conexão
+  function atualizarStatusConexao(conectado) {
+    const statusElement = document.getElementById('status-conexao');
+    const indicator = statusElement.querySelector('.status-indicator');
+
+    if (conectado) {
+      indicator.className = 'status-indicator status-online';
+      statusElement.innerHTML = '<span class="status-indicator status-online"></span>Conectado ao servidor';
+    } else {
+      indicator.className = 'status-indicator status-offline';
+      statusElement.innerHTML = '<span class="status-indicator status-offline"></span>Servidor desconectado';
+    }
+  }
+
+  // Executa o redirecionamento para o conteúdo agendado
+  function executarRedirecionamento(agendamento) {
+    if (tvConfig.isRedirecting) {
+      console.log("🔄 Já está em processo de redirecionamento");
+      return;
+    }
+
+    console.log("=== 🎯 INICIANDO REDIRECIONAMENTO ===");
+    console.log("Agendamento:", agendamento.titulo);
+
+    tvConfig.isRedirecting = true;
+
+    const targetUrl = `/api-tv/${tvConfig.categoria}/${tvConfig.numero}`;
+    console.log("🌐 URL de destino:", targetUrl);
+    console.log("🌐 URL completa:", window.location.origin + targetUrl);
+
+    adicionarLog(`🎯 Redirecionando para: ${targetUrl}`, 'redirect');
+
+    // Mostra overlay de redirecionamento
+    document.getElementById('redirect-title').innerHTML = `
+        <h2>${agendamento.titulo}</h2>
+        <p>${agendamento.descricao}</p>
+    `;
+
+    document.getElementById('redirect-overlay').style.display = 'flex';
+
+    // Countdown de 3 segundos
+    let countdown = 3;
+    const countdownElement = document.getElementById('redirect-countdown');
+
+    console.log("⏳ Iniciando countdown de 3 segundos");
+
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      countdownElement.textContent = countdown;
+      console.log("⏳ Countdown:", countdown);
+
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        console.log("🚀 REDIRECIONANDO AGORA!");
+        console.log("🌐 Destino final:", targetUrl);
+        adicionarLog(`🚀 Redirecionando: ${agendamento.titulo}`, 'success');
+
+        // Força o redirecionamento
+        window.location.href = targetUrl;
+      }
+    }, 1000);
+  }
+
+  // Mostra informações do próximo agendamento
+  function mostrarProximoAgendamento(agendamento) {
+    const container = document.getElementById('proximo-agendamento');
+    const info = document.getElementById('proximo-info');
+
+    const inicio = new Date(agendamento.dataInicio);
+    const agora = new Date();
+    const tempoRestante = inicio - agora;
+
+    if (tempoRestante > 0) {
+      const horas = Math.floor(tempoRestante / (1000 * 60 * 60));
+      const minutos = Math.floor((tempoRestante % (1000 * 60 * 60)) / (1000 * 60));
+
+      info.innerHTML = `
+                    <strong>${agendamento.titulo}</strong><br>
+                    <small>${agendamento.descricao}</small><br>
+                    ⏰ Inicia em: ${horas}h ${minutos}min<br>
+                    📅 ${inicio.toLocaleString('pt-BR')}
+                `;
+
+      container.style.display = 'block';
+    }
+  }
+
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', function() {
+    adicionarLog('Sistema de TV iniciado', 'success');
+    detectarConfigTV();
+    verificarAgendamentos();
+
+    // Verifica agendamentos periodicamente
+    checkInterval = setInterval(verificarAgendamentos, tvConfig.checkInterval);
+
+    adicionarLog(`Verificação automática configurada (${tvConfig.checkInterval/1000}s)`, 'info');
+  });
+
+  // Limpa interval quando a página é fechada
+  window.addEventListener('beforeunload', function() {
+    if (checkInterval) {
+      clearInterval(checkInterval);
+    }
+  });
+
+  // Permite configuração manual via console (para debug)
+  window.configurarTV = function(categoria, numero) {
+    tvConfig.categoria = categoria;
+    tvConfig.numero = numero;
+    atualizarInterface();
+    adicionarLog(`TV reconfigurada para: ${categoria}/${numero}`, 'warning');
+  };
+</script>
+</body>
+</html>

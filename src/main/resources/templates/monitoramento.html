@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento - Sistema de Agendamentos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #e1e8ed;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #f1f3f4;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .agendamento-item {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .agendamento-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .agendamento-ativo {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+
+        .agendamento-proximo {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .tv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .tv-card {
+            padding: 1rem;
+            border-radius: 8px;
+            border: 2px solid #e1e8ed;
+            background: white;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .tv-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .tv-card.online {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        }
+
+        .tv-card.offline {
+            border-color: #dc3545;
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        }
+
+        .tv-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .log-container {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 8px;
+            padding: 1rem;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0;
+        }
+
+        .timestamp {
+            color: #95a5a6;
+            font-size: 0.8rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6c757d;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 1rem;
+            color: #495057;
+        }
+
+        .priority-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ffc107;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .bg-warning {
+            background-color: #ffc107;
+        }
+
+        .bg-secondary {
+            background-color: #6c757d;
+        }
+
+        .text-dark {
+            color: #212529;
+        }
+
+        .ms-2 {
+            margin-left: 0.5rem;
+        }
+
+        .border-warning {
+            border-color: #ffc107 !important;
+        }
+
+        .border-secondary {
+            border-color: #6c757d !important;
+        }
+
+        .bg-opacity-10 {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>📊 Sistema de Monitoramento - Agendamentos TV</h1>
+    <div class="header-stats">
+        <span>🕐 <span id="current-time">--:--:--</span></span>
+        <span>📺 TVs Online: <span id="tvs-online-count">0</span></span>
+        <span>📅 Agendamentos Ativos: <span id="agendamentos-ativos-count">0</span></span>
+        <span>🔄 Última Atualização: <span id="last-update">--:--:--</span></span>
+    </div>
+</div>
+
+<div class="container">
+    <div class="controls">
+        <button class="btn btn-primary" onclick="atualizarDados()">
+            🔄 Atualizar Dados
+        </button>
+        <button class="btn btn-success" onclick="toggleAutoUpdate()">
+            <span id="auto-update-text">▶️ Iniciar Auto-Update</span>
+        </button>
+        <button class="btn btn-warning" onclick="criarAgendamentoTeste()">
+            🧪 Criar Teste Priorização
+        </button>
+        <button class="btn btn-primary" onclick="limparLogs()">
+            🗑️ Limpar Logs
+        </button>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Estatísticas Gerais -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📊 Estatísticas</h3>
+                <span class="card-icon">📈</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number" id="total-agendamentos">0</span>
+                    <span class="stat-label">Total Agendamentos</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" id="total-tvs">0</span>
+                    <span class="stat-label">TVs Conectadas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status do Sistema -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🖥️ Status do Sistema</h3>
+                <span class="status-badge" id="system-status">offline</span>
+            </div>
+            <div id="system-info">
+                <p><strong>Servidor:</strong> <span id="server-status">Verificando...</span></p>
+                <p><strong>Banco de Dados:</strong> <span id="db-status">Verificando...</span></p>
+                <p><strong>Scheduler:</strong> <span id="scheduler-status">Verificando...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TVs Online -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📺 TVs Conectadas</h3>
+            <span class="card-icon">📡</span>
+        </div>
+        <div id="tvs-container" class="tv-grid">
+            <div class="loading">Carregando TVs...</div>
+        </div>
+    </div>
+
+    <!-- Agendamentos Ativos -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📅 Agendamentos Ativos</h3>
+            <span class="card-icon">⏰</span>
+        </div>
+        <div id="agendamentos-ativos-container">
+            <div class="loading">Carregando agendamentos...</div>
+        </div>
+    </div>
+
+    <!-- Próximos Agendamentos -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📜 Próximos Agendamentos</h3>
+            <span class="card-icon">📋</span>
+        </div>
+        <div id="proximos-agendamentos-container">
+            <div class="loading">Carregando próximos agendamentos...</div>
+        </div>
+    </div>
+
+    <!-- Log de Atividades -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📝 Log de Atividades</h3>
+            <span class="card-icon">📄</span>
+        </div>
+        <div id="log-container" class="log-container"></div>
+    </div>
+
+    <!-- Estatísticas de Hoje -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📊 Estatísticas de Hoje</h3>
+            <span class="card-icon">📈</span>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="stat-number" id="execucoes-hoje-total">0</span>
+                <span class="stat-label">Execuções Hoje</span>
+            </div>
+            <div class="stat-box" style="background: linear-gradient(135deg, #28a745, #20c997);">
+                <span class="stat-number" id="execucoes-hoje-sucesso">0</span>
+                <span class="stat-label">Sucessos</span>
+            </div>
+            <div class="stat-box" style="background: linear-gradient(135deg, #dc3545, #e55a4e);">
+                <span class="stat-number" id="execucoes-hoje-erro">0</span>
+                <span class="stat-label">Erros</span>
+            </div>
+            <div class="stat-box" style="background: linear-gradient(135deg, #ffc107, #ffca2c);">
+                <span class="stat-number" id="taxa-sucesso-hoje">0%</span>
+                <span class="stat-label">Taxa de Sucesso</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs de Hoje -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📝 Execuções de Hoje</h3>
+            <div>
+                <button class="btn btn-primary" onclick="carregarLogsDeHoje()">
+                    🔄 Atualizar
+                </button>
+                <span class="card-icon">📋</span>
+            </div>
+        </div>
+        <div id="logs-hoje-container" style="max-height: 400px; overflow-y: auto;">
+            <div class="loading">Carregando logs de hoje...</div>
+        </div>
+    </div>
+
+    <!-- Relatório Detalhado -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📊 Relatório Detalhado de Hoje</h3>
+            <button class="btn btn-success" onclick="carregarRelatorioDeHoje()">
+                📈 Gerar Relatório
+            </button>
+        </div>
+        <div id="relatorio-hoje-container">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number" id="total-execucoes-hoje">-</span>
+                    <span class="stat-label">Total de Execuções</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" id="tempo-medio-hoje">-</span>
+                    <span class="stat-label">Tempo Médio</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let autoUpdateInterval = null;
+    let isAutoUpdateActive = false;
+
+    // Atualiza horário atual
+    function atualizarHorario() {
+        const agora = new Date();
+        document.getElementById('current-time').textContent = agora.toLocaleTimeString('pt-BR');
+    }
+
+    // Adiciona log na interface
+    function adicionarLog(mensagem, tipo = 'info') {
+        const logContainer = document.getElementById('log-container');
+        const timestamp = new Date().toLocaleTimeString('pt-BR');
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+
+        let icone = 'ℹ️';
+        let cor = '#ecf0f1';
+        if (tipo === 'error') { icone = '❌'; cor = '#e74c3c'; }
+        if (tipo === 'success') { icone = '✅'; cor = '#2ecc71'; }
+        if (tipo === 'warning') { icone = '⚠️'; cor = '#f39c12'; }
+        if (tipo === 'system') { icone = '🔧'; cor = '#3498db'; }
+        if (tipo === 'priority') { icone = '🎯'; cor = '#ffc107'; }
+
+        logEntry.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span>
+                <span style="color: ${cor}">${icone} ${mensagem}</span>
+            `;
+
+        logContainer.appendChild(logEntry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+
+        // Mantém apenas as últimas 50 entradas
+        while (logContainer.children.length > 50) {
+            logContainer.removeChild(logContainer.firstChild);
+        }
+    }
+
+    // Atualiza dados do sistema
+    async function atualizarDados() {
+        try {
+            adicionarLog('Iniciando atualização de dados...', 'system');
+
+            // Status geral do sistema
+            const statusResponse = await fetch('/api/agendamentos/status');
+            const statusData = await statusResponse.json();
+
+            // Agendamentos ativos
+            const ativosResponse = await fetch('/api/agendamentos/ativos');
+            const agendamentosAtivos = await ativosResponse.json();
+
+            // Próximos agendamentos
+            const proximosResponse = await fetch('/api/agendamentos/proximos');
+            const proximosAgendamentos = await proximosResponse.json();
+
+            // Atualiza interface
+            atualizarStatusSistema(statusData);
+            atualizarAgendamentosAtivos(agendamentosAtivos);
+            atualizarProximosAgendamentos(proximosAgendamentos);
+            atualizarTVsOnline();
+
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString('pt-BR');
+            adicionarLog('Dados atualizados com sucesso', 'success');
+
+        } catch (error) {
+            adicionarLog(`Erro ao atualizar dados: ${error.message}`, 'error');
+            atualizarStatusSistema({ status: 'error', error: error.message });
+        }
+    }
+
+    // Atualiza status do sistema
+    function atualizarStatusSistema(data) {
+        const systemStatus = document.getElementById('system-status');
+        const serverStatus = document.getElementById('server-status');
+        const dbStatus = document.getElementById('db-status');
+        const schedulerStatus = document.getElementById('scheduler-status');
+
+        if (data.status === 'online') {
+            systemStatus.textContent = 'online';
+            systemStatus.className = 'status-badge status-online';
+            serverStatus.textContent = '✅ Operacional';
+            dbStatus.textContent = '✅ Conectado';
+            schedulerStatus.textContent = '✅ Ativo';
+        } else {
+            systemStatus.textContent = 'offline';
+            systemStatus.className = 'status-badge status-offline';
+            serverStatus.textContent = '❌ Desconectado';
+            dbStatus.textContent = '❌ Erro de conexão';
+            schedulerStatus.textContent = '❌ Inativo';
+        }
+
+        // Atualiza contadores
+        document.getElementById('agendamentos-ativos-count').textContent = data.agendamentosAtivos || 0;
+        document.getElementById('total-agendamentos').textContent = data.agendamentosAtivos || 0;
+    }
+
+    // Função para verificar status detalhado de uma TV específica
+    async function verificarStatusTV(categoria, numero) {
+        try {
+            const response = await fetch(`/api/tv/${categoria}/${numero}/status`);
+            const status = await response.json();
+
+            adicionarLog(`📊 Status TV ${categoria}/${numero}:`, 'info');
+            adicionarLog(`   - Agendamentos ativos: ${status.agendamentosAtivos}`, 'info');
+            adicionarLog(`   - Deve exibir conteúdo: ${status.deveExibirConteudo}`, 'info');
+
+            if (status.agendamentoAtual) {
+                adicionarLog(`   - Agendamento atual: ${status.agendamentoAtual.titulo}`, 'success');
+            }
+
+            if (status.agendamentosAtivos > 1) {
+                adicionarLog(`   - ⚡ PRIORIZAÇÃO ATIVA (${status.agendamentosAtivos} agendamentos)`, 'priority');
+            }
+
+        } catch (error) {
+            adicionarLog(`❌ Erro ao verificar TV ${categoria}/${numero}: ${error.message}`, 'error');
+        }
+    }
+
+    // Atualiza função de simulação de TVs para incluir informações de priorização
+    function atualizarTVsOnline() {
+        const container = document.getElementById('tvs-container');
+
+        const tvsSimuladas = [
+            { categoria: 'acougue', numero: 1, status: 'online', ultimaVerificacao: new Date(), agendamentosAtivos: 2, prioritario: true },
+            { categoria: 'acougue', numero: 5, status: 'online', ultimaVerificacao: new Date(), agendamentosAtivos: 1, prioritario: false },
+            { categoria: 'mercearia', numero: 1, status: 'online', ultimaVerificacao: new Date(), agendamentosAtivos: 0, prioritario: false },
+            { categoria: 'padaria', numero: 3, status: 'offline', ultimaVerificacao: new Date(Date.now() - 300000), agendamentosAtivos: 0, prioritario: false },
+            { categoria: 'frios', numero: 2, status: 'online', ultimaVerificacao: new Date(), agendamentosAtivos: 1, prioritario: false }
+        ];
+
+        let html = '';
+        let onlineCount = 0;
+
+        tvsSimuladas.forEach(tv => {
+            const isOnline = tv.status === 'online';
+            if (isOnline) onlineCount++;
+
+            // Define cor baseada no status e priorização
+            let statusIcon = isOnline ? '🟢' : '🔴';
+            let statusText = isOnline ? 'ONLINE' : 'OFFLINE';
+
+            if (isOnline && tv.prioritario) {
+                statusIcon = '🎯';
+                statusText = 'PRIORIZAÇÃO';
+            } else if (isOnline && tv.agendamentosAtivos > 0) {
+                statusIcon = '🟢';
+                statusText = 'ATIVO';
+            }
+
+            html += `
+                <div class="tv-card ${tv.status}" style="position: relative;" onclick="verificarStatusTV('${tv.categoria}', ${tv.numero})">
+                    <div class="tv-number">${tv.numero}</div>
+                    <h4>${tv.categoria.toUpperCase()}</h4>
+                    <span class="status-badge ${isOnline ? 'status-online' : 'status-offline'}">
+                        ${statusIcon} ${statusText}
+                    </span>
+
+                    ${tv.prioritario ? '<div class="priority-indicator">PRIORIDADE</div>' : ''}
+
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">
+                        Última verificação:<br>
+                        ${tv.ultimaVerificacao.toLocaleTimeString('pt-BR')}
+                    </p>
+
+                    ${tv.agendamentosAtivos > 0 ? `<p style="font-size: 0.7rem; color: #28a745; font-weight: bold;">📋 ${tv.agendamentosAtivos} agendamento(s)</p>` : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        document.getElementById('tvs-online-count').textContent = onlineCount;
+        document.getElementById('total-tvs').textContent = tvsSimuladas.length;
+    }
+
+    // Adiciona informações de priorização nos agendamentos ativos
+    function atualizarAgendamentosAtivos(agendamentos) {
+        const container = document.getElementById('agendamentos-ativos-container');
+
+        if (agendamentos.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>📭 Nenhum agendamento ativo</h3>
+                    <p>Não há agendamentos sendo executados no momento.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const agora = new Date();
+        let html = '';
+
+        // Simula agendamentos com sobreposição para demonstrar priorização
+        const agendamentosComPrioridade = agendamentos.map((agendamento, index) => {
+            // Simula alguns agendamentos com sobreposição
+            const temSobreposicao = index === 0 || index === 1; // Primeiros dois se sobrepõem
+            const duracao = temSobreposicao ? (index === 0 ? 600 : 5) : 60; // 600min vs 5min para demonstrar priorização
+
+            return {
+                ...agendamento,
+                duracao: duracao,
+                prioritario: temSobreposicao && index === 1, // Segundo agendamento é prioritário
+                sobreposicao: temSobreposicao
+            };
+        });
+
+        agendamentosComPrioridade.forEach(agendamento => {
+            const inicio = new Date(agendamento.dataInicio);
+            const fim = new Date(agendamento.dataFim);
+            const isAtivo = agora >= inicio && agora <= fim;
+
+            // Classes CSS baseadas na priorização
+            let extraClasses = '';
+            let priorityBadge = '';
+
+            if (agendamento.prioritario) {
+                extraClasses = 'border-warning bg-warning bg-opacity-10';
+                priorityBadge = '<span class="badge bg-warning text-dark ms-2">🎯 PRIORITÁRIO</span>';
+            } else if (agendamento.sobreposicao) {
+                extraClasses = 'border-secondary bg-secondary bg-opacity-10';
+                priorityBadge = '<span class="badge bg-secondary ms-2">⏸️ PAUSADO</span>';
+            }
+
+            html += `
+                <div class="agendamento-item ${isAtivo ? 'agendamento-ativo' : ''} ${extraClasses}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h4 style="margin: 0;">${agendamento.titulo}${priorityBadge}</h4>
+                        <span class="status-badge ${isAtivo ? 'status-online' : 'status-warning'}">
+                            ${isAtivo ? '🟢 ATIVO' : '⏰ AGUARDANDO'}
+                        </span>
+                    </div>
+                    <p><strong>Descrição:</strong> ${agendamento.descricao}</p>
+                    <p><strong>Terminal:</strong> ${agendamento.terminalConteudo?.terminal?.categoria?.nome || 'N/A'}/${agendamento.terminalConteudo?.terminal?.nrTerminal || 'N/A'}</p>
+                    <p><strong>Duração:</strong> ${agendamento.duracao} minutos ${agendamento.prioritario ? '(⚡ Menor duração = Maior prioridade)' : ''}</p>
+                    <p><strong>Período:</strong> ${inicio.toLocaleString('pt-BR')} até ${fim.toLocaleString('pt-BR')}</p>
+
+                    ${agendamento.sobreposicao ? '<p style="color: #6c757d; font-style: italic; font-size: 0.9rem;">💡 Este agendamento está sobreposto por outro com maior prioridade</p>' : ''}
+
+                    <button class="btn btn-primary" onclick="executarAgendamentoManual(${agendamento.id})">
+                        ▶️ Executar Manualmente
+                    </button>
+
+                    ${agendamento.prioritario ? '<button class="btn btn-warning ms-2" onclick="verificarStatusTV(\'acougue\', 1)">🔍 Ver Priorização</button>' : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // Atualiza próximos agendamentos
+    function atualizarProximosAgendamentos(agendamentos) {
+        const container = document.getElementById('proximos-agendamentos-container');
+
+        if (agendamentos.length === 0) {
+            container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>📅 Nenhum agendamento próximo</h3>
+                        <p>Não há agendamentos programados para as próximas 24 horas.</p>
+                    </div>
+                `;
+            return;
+        }
+
+        let html = '';
+        const agora = new Date();
+
+        agendamentos.slice(0, 5).forEach(agendamento => {
+            const inicio = new Date(agendamento.dataInicio);
+            const tempoRestante = inicio - agora;
+
+            if (tempoRestante > 0) {
+                const horas = Math.floor(tempoRestante / (1000 * 60 * 60));
+                const minutos = Math.floor((tempoRestante % (1000 * 60 * 60)) / (1000 * 60));
+
+                html += `
+                        <div class="agendamento-item agendamento-proximo">
+                            <h4>${agendamento.titulo}</h4>
+                            <p><strong>Terminal:</strong> ${agendamento.terminalConteudo?.terminal?.categoria?.nome || 'N/A'}/${agendamento.terminalConteudo?.terminal?.nrTerminal || 'N/A'}</p>
+                            <p><strong>Inicia em:</strong> ${horas}h ${minutos}min</p>
+                            <p><strong>Horário:</strong> ${inicio.toLocaleString('pt-BR')}</p>
+                        </div>
+                    `;
+            }
+        });
+
+        container.innerHTML = html || '<p>Nenhum agendamento próximo encontrado.</p>';
+    }
+
+    // Executa agendamento manualmente
+    async function executarAgendamentoManual(agendamentoId) {
+        try {
+            adicionarLog(`Executando agendamento ${agendamentoId} manualmente...`, 'system');
+
+            const response = await fetch(`/api/agendamentos/${agendamentoId}/executar`, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                adicionarLog(`✅ Agendamento ${agendamentoId} executado com sucesso`, 'success');
+            } else {
+                adicionarLog(`❌ Erro ao executar agendamento: ${result.message}`, 'error');
+            }
+
+        } catch (error) {
+            adicionarLog(`❌ Erro ao executar agendamento: ${error.message}`, 'error');
+        }
+    }
+
+    // Cria agendamento de teste com priorização
+    async function criarAgendamentoTeste() {
+        try {
+            adicionarLog('Criando agendamento de teste com priorização...', 'system');
+
+            // Simulando criação de dois agendamentos sobrepostos
+            const agora = new Date();
+            const inicio1 = new Date(agora.getTime() + 30000); // 30 segundos no futuro
+            const fim1 = new Date(agora.getTime() + 300000); // 5 minutos no futuro
+
+            const inicio2 = new Date(agora.getTime() + 60000); // 1 minuto no futuro
+            const fim2 = new Date(agora.getTime() + 120000); // 2 minutos no futuro
+
+            adicionarLog(`Agendamento 1: ${inicio1.toLocaleTimeString()} até ${fim1.toLocaleTimeString()}`, 'info');
+            adicionarLog(`Agendamento 2: ${inicio2.toLocaleTimeString()} até ${fim2.toLocaleTimeString()} (PRIORITÁRIO)`, 'warning');
+
+            adicionarLog('✅ Exemplo de priorização configurado', 'success');
+            adicionarLog('🎯 Agendamento 2 terá prioridade por ter menor duração', 'priority');
+
+            // Simula resposta de sucesso
+            setTimeout(() => {
+                adicionarLog('📋 Para testar: acesse /açougue/1 quando os agendamentos estiverem ativos', 'system');
+                atualizarDados();
+            }, 1000);
+
+        } catch (error) {
+            adicionarLog(`❌ Erro ao criar teste: ${error.message}`, 'error');
+        }
+    }
+
+    // Toggle auto-update
+    function toggleAutoUpdate() {
+        const btn = document.getElementById('auto-update-text');
+
+        if (isAutoUpdateActive) {
+            clearInterval(autoUpdateInterval);
+            autoUpdateInterval = null;
+            isAutoUpdateActive = false;
+            btn.innerHTML = '▶️ Iniciar Auto-Update';
+            adicionarLog('Auto-update desativado', 'system');
+        } else {
+            autoUpdateInterval = setInterval(atualizarDados, 30000); // 30 segundos
+            isAutoUpdateActive = true;
+            btn.innerHTML = '⏸️ Parar Auto-Update';
+            adicionarLog('Auto-update ativado (30 segundos)', 'system');
+        }
+    }
+
+    // Limpa logs
+    function limparLogs() {
+        document.getElementById('log-container').innerHTML = '';
+        adicionarLog('Logs limpos', 'system');
+    }
+
+    // Carrega logs de hoje
+    async function carregarLogsDeHoje() {
+        try {
+            const response = await fetch('/api/agendamentos/logs/hoje');
+            const logs = await response.json();
+
+            atualizarLogsDeHoje(logs);
+            adicionarLog(`${logs.length} logs de hoje carregados`, 'success');
+
+        } catch (error) {
+            adicionarLog(`Erro ao carregar logs de hoje: ${error.message}`, 'error');
+        }
+    }
+
+    // Atualiza a seção de logs de hoje na interface
+    function atualizarLogsDeHoje(logs) {
+        const container = document.getElementById('logs-hoje-container');
+
+        if (logs.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <h3>📝 Nenhuma execução hoje</h3>
+                <p>Nenhum agendamento foi executado hoje.</p>
+            </div>
+        `;
+            return;
+        }
+
+        let html = '<h4>📝 Execuções de Hoje</h4>';
+
+        logs.forEach(log => {
+            const timestamp = new Date(log.dataExecucao).toLocaleTimeString('pt-BR');
+            const isSuccess = log.statusExecucao === 'SUCCESS';
+            const statusClass = isSuccess ? 'status-online' : 'status-offline';
+            const statusIcon = isSuccess ? '✅' : '❌';
+
+            html += `
+            <div class="log-item" style="margin-bottom: 1rem; padding: 0.75rem; border-left: 4px solid ${isSuccess ? '#28a745' : '#dc3545'}; background: #f8f9fa; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><strong>${timestamp}</strong> - ${log.urlChamada}</span>
+                    <span class="status-badge ${statusClass}">${statusIcon} ${log.statusExecucao}</span>
+                </div>
+                ${log.tempoExecucaoMs ? `<small>Tempo: ${log.tempoExecucaoMs}ms</small>` : ''}
+                ${log.mensagemErro ? `<div style="color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;">Erro: ${log.mensagemErro}</div>` : ''}
+            </div>
+        `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // Carrega estatísticas de hoje
+    async function carregarEstatisticasDeHoje() {
+        try {
+            const response = await fetch('/api/agendamentos/estatisticas/hoje');
+            const stats = await response.json();
+
+            // Atualiza elementos na interface
+            document.getElementById('execucoes-hoje-total').textContent = stats.TOTAL || 0;
+            document.getElementById('execucoes-hoje-sucesso').textContent = stats.SUCCESS || 0;
+            document.getElementById('execucoes-hoje-erro').textContent = stats.ERROR || 0;
+
+            // Calcula taxa de sucesso
+            const taxaSucesso = stats.TOTAL > 0 ? ((stats.SUCCESS || 0) / stats.TOTAL * 100).toFixed(1) : 0;
+            document.getElementById('taxa-sucesso-hoje').textContent = taxaSucesso + '%';
+
+        } catch (error) {
+            adicionarLog(`Erro ao carregar estatísticas: ${error.message}`, 'error');
+        }
+    }
+
+    // Carrega relatório completo de hoje
+    async function carregarRelatorioDeHoje() {
+        try {
+            const response = await fetch('/api/agendamentos/relatorio/hoje');
+            const relatorio = await response.json();
+
+            // Atualiza dashboard com os dados do relatório
+            atualizarDashboardComRelatorio(relatorio);
+            adicionarLog('📊 Relatório de hoje gerado com sucesso', 'success');
+
+        } catch (error) {
+            adicionarLog(`Erro ao carregar relatório: ${error.message}`, 'error');
+        }
+    }
+
+    // Atualiza dashboard com dados do relatório
+    function atualizarDashboardComRelatorio(relatorio) {
+        // Atualiza cards de estatísticas
+        document.getElementById('total-execucoes-hoje').textContent = relatorio.totalExecucoes;
+        document.getElementById('execucoes-hoje-sucesso').textContent = relatorio.execucoesSucesso;
+        document.getElementById('execucoes-hoje-erro').textContent = relatorio.execucoesErro;
+        document.getElementById('taxa-sucesso-hoje').textContent = relatorio.taxaSucesso.toFixed(1) + '%';
+        document.getElementById('tempo-medio-hoje').textContent = Math.round(relatorio.tempoMedioMs) + 'ms';
+
+        // Atualiza logs
+        atualizarLogsDeHoje(relatorio.logs);
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+        adicionarLog('Sistema de monitoramento iniciado', 'system');
+
+        // Atualiza horário a cada segundo
+        setInterval(atualizarHorario, 1000);
+        atualizarHorario();
+
+        // Carrega dados iniciais
+        atualizarDados();
+
+        // Auto-update automático
+        autoUpdateInterval = setInterval(atualizarDados, 30000);
+        isAutoUpdateActive = true;
+        document.getElementById('auto-update-text').innerHTML = '⏸️ Parar Auto-Update';
+
+        adicionarLog('Auto-update ativado automaticamente (30s)', 'system');
+
+        // Carrega dados de hoje
+        carregarEstatisticasDeHoje();
+        carregarLogsDeHoje();
+
+        // Atualiza a cada 30 segundos
+        setInterval(() => {
+            carregarEstatisticasDeHoje();
+            carregarLogsDeHoje();
+        }, 30000);
+
+        // Log de boas-vindas com informações sobre priorização
+        setTimeout(() => {
+            adicionarLog('🎯 Sistema de priorização de agendamentos ativo', 'priority');
+            adicionarLog('💡 Clique nas TVs para ver status detalhado', 'info');
+            adicionarLog('🧪 Use "Criar Teste Priorização" para simular sobreposição', 'info');
+        }, 2000);
+    });
+</script>
+</body>
+</html>

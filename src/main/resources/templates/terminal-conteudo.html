@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${terminal.nome}">Terminal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        .terminal-header {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            padding: 20px;
+            text-align: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .content-area {
+            margin-top: 100px;
+            padding: 20px;
+            height: calc(100vh - 120px);
+            overflow: auto;
+        }
+        .produtos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        .produto-card {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        .produto-card:hover {
+            transform: scale(1.05);
+        }
+        .preco {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #27ae60;
+        }
+        .info-terminal {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="terminal-header">
+    <h1 th:text="${terminal.categoria.nomeExibicao}">Categoria</h1>
+    <h2 th:text="${terminal.nome}">Terminal</h2>
+    <p th:text="${terminal.localizacao}">Localização</p>
+</div>
+
+<div class="content-area">
+    <!-- Conteúdo será carregado via JavaScript do seu ProdutoService -->
+    <div id="produtos-container" class="produtos-grid">
+        <p>Carregando produtos...</p>
+    </div>
+</div>
+
+<div class="info-terminal">
+    <div>Terminal: <span th:text="${numero}">0</span></div>
+    <div>Categoria: <span th:text="${categoria}">categoria</span></div>
+    <div id="horario-atual"></div>
+</div>
+
+<script th:inline="javascript">
+    // Configurações da TV
+    let tvConfig = {
+        baseUrl: '/api-tv',
+        checkInterval: 15000, // 15 segundos
+        isRedirecting: false
+    };
+
+    const categoria = /*[[${categoria}]]*/ 'categoria';
+    const numero = /*[[${numero}]]*/ 0;
+
+    // Registra abertura da TV
+    fetch(`${tvConfig.baseUrl}/api/tv/${categoria}/${numero}/abrir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timestamp: new Date().toISOString() })
+    });
+
+    // Carrega produtos usando seu ProdutoService existente
+    async function carregarProdutos() {
+        try {
+            const response = await fetch(`${tvConfig.baseUrl}/api-tv/${categoria}/${numero}`);
+            const produtos = await response.json();
+
+            const container = document.getElementById('produtos-container');
+            if (produtos && produtos.length > 0) {
+                container.innerHTML = produtos.map(produto => `
+                        <div class="produto-card">
+                            <h3>${produto.nome}</h3>
+                            <p>${produto.descricao}</p>
+                            <div class="preco">R$ ${produto.preco}</div>
+                            ${produto.precoPromocao > 0 ? `<div style="color: #e74c3c;">Promoção: R$ ${produto.precoPromocao}</div>` : ''}
+                        </div>
+                    `).join('');
+            } else {
+                container.innerHTML = '<p>Nenhum produto disponível</p>';
+            }
+        } catch (error) {
+            console.error('Erro ao carregar produtos:', error);
+        }
+    }
+
+    // Atualiza horário
+    function atualizarHorario() {
+        document.getElementById('horario-atual').textContent =
+            'Horário: ' + new Date().toLocaleString('pt-BR');
+    }
+
+    // Verifica se ainda deve exibir conteúdo
+    async function verificarStatus() {
+        try {
+            const response = await fetch(`${tvConfig.baseUrl}/api/tv/${categoria}/${numero}/status`);
+            const status = await response.json();
+
+            if (!status.deveExibirConteudo) {
+                // Se não deve mais exibir, volta para a página de standby
+                window.location.href = '/tv?categoria=' + categoria + '&numero=' + numero;
+            }
+        } catch (error) {
+            console.error('Erro ao verificar status:', error);
+        }
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+        carregarProdutos();
+        atualizarHorario();
+
+        // Atualiza horário a cada minuto
+        setInterval(atualizarHorario, 60000);
+
+        // Verifica status a cada 30 segundos
+        setInterval(verificarStatus, 30000);
+    });
+</script>
+</body>
+</html>
