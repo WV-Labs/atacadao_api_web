@@ -36,10 +36,9 @@
     }
 
     video, img {
-      max-width: 100vw;
-      max-height: 100vh;
-      width: auto;
-      height: auto;
+
+      width: 100vw;
+      height: 100vh;
       object-fit: contain;
     }
 
@@ -95,6 +94,7 @@
       z-index: 1000;
       font-family: monospace;
       width: 50%;
+      display: none;
     }
 
     /* Status verificação */
@@ -250,12 +250,10 @@
 
   <!-- Video -->
   <div class="video-container" th:id="divVideo" th:align="center">
-    <video id="video" controls playsinline autoplay muted loop
-           th:onloadstart="'debugLog(\'Iniciando carregamento do vídeo:\', this.currentSrc);'"
-           th:onerror="'debugLog(\'Erro no vídeo:\', this.error); document.getElementById(\'debug-info\').classList.add(\'show\');'">
+    <video id="video" controls playsinline autoplay muted preload="auto" loop>
       <source id="sourceVideo" type="video/mp4">
     </video>
-
+    <input type="hidden" id="videoCaminho" />
   </div>
 
   <!-- Tabela de Preços -->
@@ -272,7 +270,7 @@
 
       <!-- Lista de Produtos -->
       <div class="w-100">
-        <div class="produtos" id="lista-produtos">
+        <div class="produtos border border-2 border-warning py-2" id="lista-produtos">
           <!-- Produto renderizado via Thymeleaf -->
 
           <!-- Caso nenhum produto -->
@@ -301,7 +299,8 @@
     qtdeLinhas: /*[[${qtdeLinhas}]]*/ 8,
     caminhoArquivo: /*[[${caminhoCompletoArquivo}]]*/ '',
     repeticaoPreco: 0,
-    serverIP: /*[[${serverIP}]]*/ 'localhost'
+    serverIP: /*[[${serverIP}]]*/ 'localhost',
+    debugDisplay: /*[[${debugDisplay}]]*/ 'none'
   };
   function getServerURL() {
     const hostname = window.location.hostname;
@@ -619,6 +618,8 @@
       }, 8000);
   }
 
+  const videoCache = {};
+
   function verificaTipoConteudo() {
     let idAgendamentoPrioritario = $('#idAgendamentoPrioritario').val();
     if(TV_CONFIG.tipoConteudo==3 && TV_CONFIG.repeticaoPreco >= 2 ){
@@ -656,6 +657,8 @@
           console.log("**** Carregando tabela ******");
           inicializarRolagemProdutos(response);
         } else if (response[0].tipoConteudo === 2) {
+          const videoUrl = response[0].caminhoImagemVideo;
+
           $('.video-container').addClass('d-block');
           $('.video-container').removeClass('d-none');
           $('.image-container').removeClass('d-block');
@@ -666,8 +669,23 @@
           console.log("**** Carregando video ******");
           debugLog(response[0].caminhoImagemVideo);
           console.log("SRC = " + response[0].caminhoImagemVideo);
-          $('#sourceVideo').attr('src', response[0].caminhoImagemVideo);
-          $('#video')[0].load();
+          if (videoCache[videoUrl]) {
+            $('#sourceVideo').attr('src', videoCache[videoUrl]);
+            $('#video')[0].load();
+            $('#video')[0].play();
+            return;
+          }else {
+            fetch(videoUrl)
+                    .then(res => res.blob())
+                    .then(blob => {
+                      const objectURL = URL.createObjectURL(blob);
+                      videoCache[videoUrl] = objectURL;
+                      $('#sourceVideo').attr('src', objectURL);
+                      $('#video')[0].load();
+                      $('#video')[0].play();
+                    })
+                    .catch(err => console.error('Erro ao carregar vídeo:', err));
+          }
         } else {
           debugLog(`📋 Carregando imagem`);
           $('.image-container').addClass('d-block');
@@ -692,6 +710,13 @@
       debugLog(`📡 Status: ${xhr.status}`);
     });
   }
+
+  /*const videoListener = document.getElementById('video');
+  videoListener.addEventListener('ended', () => {
+    const novoVideo = videoListener.cloneNode(true);
+    videoListener.parentNode.replaceChild(novoVideo, videoListener);
+    novoVideo.play();
+  });*/
 
   // === INICIALIZAÇÃO ===
   document.addEventListener("DOMContentLoaded", function () {
@@ -756,8 +781,7 @@
         font-size: 12px;
         z-index: 10000;
         max-width: 600px;
-        display: block;
-    `;
+        display: ${TV_CONFIG.debugDisplay};`;
       document.body.appendChild(debugDiv);
       return debugDiv;
     }
