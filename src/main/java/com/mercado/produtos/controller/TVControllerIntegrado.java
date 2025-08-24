@@ -37,6 +37,8 @@ public class TVControllerIntegrado {
     private int qtdeLinhas;
     @Value("${app-tv.uploads}")
     private String uploadDir;
+    @Value("${api-tv.debugDisplay}")
+    private String debugDisplay;
 
     @GetMapping("/")
     public String index(Model model) {
@@ -52,6 +54,7 @@ public class TVControllerIntegrado {
         model.addAttribute("intervaloVerificacao", intervaloVerificacao);
         model.addAttribute("baseUrl", baseUrl);
         model.addAttribute("serverIP", serverIP);
+        model.addAttribute("debugDisplay", debugDisplay);
         model.addAttribute("qtdeLinhas", qtdeLinhas);
         return "tv-sistema";
     }
@@ -125,6 +128,7 @@ public class TVControllerIntegrado {
         model.addAttribute("intervaloVerificacao", intervaloVerificacao);
         model.addAttribute("baseUrl", baseUrl);
         model.addAttribute("serverIP", serverIP);
+        model.addAttribute("debugDisplay", debugDisplay);
         model.addAttribute("categoria", categoria);
         model.addAttribute("numero", numero);
         model.addAttribute("qtdeLinhas", qtdeLinhas);
