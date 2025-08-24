@@ -4,6 +4,9 @@ import com.mercado.produtos.dao.dto.ProdutoDto;
 import com.mercado.produtos.dao.model.Conteudo;
 import com.mercado.produtos.service.ProdutoApiService;
 import com.mercado.produtos.service.TVService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,10 +16,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 @Controller
 @Slf4j
@@ -32,6 +31,8 @@ public class TVControllerIntegrado {
     private int intervaloVerificacao;
     @Value("${api-tv.tv.base.url}")
     private String baseUrl;
+    @Value("${api-tv.serverIP}")
+    private String serverIP;
     @Value("${api-tv.tv.qtdeLinhas}")
     private int qtdeLinhas;
     @Value("${app-tv.uploads}")
@@ -50,8 +51,33 @@ public class TVControllerIntegrado {
         // Passa configurações do application.properties para o template
         model.addAttribute("intervaloVerificacao", intervaloVerificacao);
         model.addAttribute("baseUrl", baseUrl);
+        model.addAttribute("serverIP", serverIP);
         model.addAttribute("qtdeLinhas", qtdeLinhas);
         return "tv-sistema";
+    }
+
+    /**
+     * Página de conteúdo da TV com lógica de priorização
+     * Esta URL substitui temporariamente seu endpoint original
+     */
+    @GetMapping("/interno/{categoria}/{numero}/{idAgendamentoPrioritario}")
+    public @ResponseBody List<ProdutoDto> indexAjax(@PathVariable String categoria, @PathVariable Integer numero, @PathVariable Long idAgendamentoPrioritario, Model model) {
+        log.info("🔍 Verificando agendamentos para categoria '{}' da TV '{}'", categoria, numero);
+
+        try {
+            List<Conteudo> conteudos = getConteudos(categoria, numero, idAgendamentoPrioritario);
+            if (conteudos.isEmpty()) {
+                log.info("📭 Nenhum agendamento ativo para {}/{} - redirecionando para standby", categoria, numero);
+                return null;
+            }
+            return getListaProdutos(categoria, numero, model, conteudos);
+
+        } catch (Exception e) {
+            log.error("❌ Erro ao verificar agendamentos para {}/{}: {}", categoria, numero, e.getMessage());
+
+            // Em caso de erro, redireciona para standby
+            return null;
+        }
     }
 
     /**
@@ -63,45 +89,12 @@ public class TVControllerIntegrado {
         log.info("🔍 Verificando agendamentos para categoria '{}' da TV '{}'", categoria, numero);
 
         try {
-            // Registra que a TV está verificando o sistema
-            tvService.registrarVerificacaoTV(categoria, numero);
-
-            // Verifica se deve exibir conteúdo agendado (COM LÓGICA DE PRIORIZAÇÃO)
-            List<Conteudo> conteudos = tvService.exibirConteudo(categoria, numero);
-
+            List<Conteudo> conteudos = getConteudos(categoria, numero);
             if (conteudos.isEmpty()) {
                 log.info("📭 Nenhum agendamento ativo para {}/{} - redirecionando para standby", categoria, numero);
                 return "redirect:/tv?categoria=" + categoria + "&numero=" + numero;
             }
-
-            // Pega o conteúdo prioritário (primeiro da lista já vem priorizado)
-            Conteudo conteudoPrioritario = conteudos.get(0);
-            log.info("🎯 Conteúdo prioritário encontrado: {} (Tipo: {})",
-                    conteudoPrioritario.getTitulo(), conteudoPrioritario.getTipoConteudo());
-
-            // Busca informações de status completo para o template
-            Map<String, Object> statusCompleto = tvService.getStatusCompleto(categoria, numero);
-
-            // Prepara model baseado no tipo de conteúdo
-            prepararModelParaConteudo(model, conteudoPrioritario, categoria, numero);
-
-            // Adiciona informações de status e priorização
-            model.addAttribute("agendamentosAtivos", statusCompleto.get("agendamentosAtivos"));
-            model.addAttribute("deveExibirConteudo", statusCompleto.get("deveExibirConteudo"));
-
-            // Adiciona configurações básicas
-            model.addAttribute("intervaloVerificacao", intervaloVerificacao);
-            model.addAttribute("baseUrl", baseUrl);
-            model.addAttribute("categoria", categoria);
-            model.addAttribute("numero", numero);
-            model.addAttribute("qtdeLinhas", qtdeLinhas);
-
-            // Log adicional para debugging
-            log.info("📊 Status: agendamentosAtivos={}, categoria={}, produtos={}",
-                    statusCompleto.get("agendamentosAtivos"), categoria,
-                    model.getAttribute("produtos") != null ?
-                            ((List<?>) model.getAttribute("produtos")).size() : 0);
-
+            getListaProdutos(categoria, numero, model, conteudos);
             return "index";
 
         } catch (Exception e) {
@@ -112,8 +105,53 @@ public class TVControllerIntegrado {
         }
     }
 
-    private void prepararModelParaConteudo(Model model, Conteudo conteudo, String categoria, Integer numero) {
-        List<ProdutoDto> produtoDtos = Collections.emptyList();
+    private List<ProdutoDto> getListaProdutos(String categoria, Integer numero, Model model, List<Conteudo> conteudos) {
+        // Pega o conteúdo prioritário (primeiro da lista já vem priorizado)
+        Conteudo conteudoPrioritario = conteudos.get(0);
+        log.info("🎯 Conteúdo prioritário encontrado: {} (Tipo: {})",
+                conteudoPrioritario.getTitulo(), conteudoPrioritario.getTipoConteudo());
+
+        // Busca informações de status completo para o template
+        Map<String, Object> statusCompleto = tvService.getStatusCompleto(categoria, numero);
+
+        // Prepara model baseado no tipo de conteúdo
+        List<ProdutoDto> produtoDtos = prepararModelParaConteudo(model, conteudoPrioritario, categoria, numero);
+
+        // Adiciona informações de status e priorização
+        model.addAttribute("agendamentosAtivos", statusCompleto.get("agendamentosAtivos"));
+        model.addAttribute("deveExibirConteudo", statusCompleto.get("deveExibirConteudo"));
+
+        // Adiciona configurações básicas
+        model.addAttribute("intervaloVerificacao", intervaloVerificacao);
+        model.addAttribute("baseUrl", baseUrl);
+        model.addAttribute("serverIP", serverIP);
+        model.addAttribute("categoria", categoria);
+        model.addAttribute("numero", numero);
+        model.addAttribute("qtdeLinhas", qtdeLinhas);
+
+        // Log adicional para debugging
+        log.info("📊 Status: agendamentosAtivos={}, categoria={}, produtos={}",
+                statusCompleto.get("agendamentosAtivos"), categoria,
+                model.getAttribute("produtos") != null ?
+                        ((List<?>) model.getAttribute("produtos")).size() : 0);
+        return produtoDtos;
+    }
+
+    private List<Conteudo> getConteudos(String categoria, Integer numero) {
+        return getConteudos(categoria, numero, 0L);
+    }
+
+    private List<Conteudo> getConteudos(String categoria, Integer numero, Long idAgendamentoPrioritario) {
+        // Registra que a TV está verificando o sistema
+        tvService.registrarVerificacaoTV(categoria, numero);
+
+        // Verifica se deve exibir conteúdo agendado (COM LÓGICA DE PRIORIZAÇÃO)
+        List<Conteudo> conteudos = tvService.exibirConteudo(categoria, numero, idAgendamentoPrioritario);
+        return conteudos;
+    }
+
+    private List<ProdutoDto> prepararModelParaConteudo(Model model, Conteudo conteudo, String categoria, Integer numero) {
+        List<ProdutoDto> produtoDtos = new ArrayList<>();
 
         // Tipo 3 = conteúdo de produtos (busca na API)
         if (conteudo.getTipoConteudo() == 3) {
@@ -150,9 +188,16 @@ public class TVControllerIntegrado {
             model.addAttribute("descCategoria", categoria.toUpperCase());
             model.addAttribute("tipoConteudo", conteudo.getTipoConteudo());
             model.addAttribute("caminhoCompletoArquivo", uploadDir + conteudo.getNomeMidia());
-            model.addAttribute("caminhoCompletoArquivoteste", uploadDir + "20250818_172202_fe85452e.jpg");
-
+            ProdutoDto produtoDto = new ProdutoDto();
+            produtoDto.setCaminhoImagemVideo(uploadDir + conteudo.getNomeMidia());
+            produtoDto.setTipoConteudo(conteudo.getTipoConteudo());
+            produtoDto.setDescricaoCategoria(categoria.toUpperCase());
+            produtoDtos.add(produtoDto);
             log.info("🎬 Conteúdo de mídia: {} (Tipo: {})", conteudo.getTitulo(), conteudo.getTipoConteudo());
+        }
+
+        for (ProdutoDto p : produtoDtos) {
+            p.setIdAgendamentoPrioritario(conteudo.getIdAgendamentoPrioritario());
         }
 
         // Adiciona dados básicos do conteúdo
@@ -164,6 +209,7 @@ public class TVControllerIntegrado {
         // *** GARANTE QUE A CATEGORIA SEJA SEMPRE A CORRETA ***
         model.addAttribute("categoria", categoria);
         model.addAttribute("numero", numero);
+        return produtoDtos;
     }
 
     /**
@@ -186,10 +232,7 @@ public class TVControllerIntegrado {
             log.info("🔌 API chamada para produtos: {}/{}", categoria, numero);
 
             // Registra verificação da TV
-            tvService.registrarVerificacaoTV(categoria, numero);
-
-            // Verifica se há agendamento ativo antes de buscar produtos
-            List<Conteudo> conteudosAtivos = tvService.exibirConteudo(categoria, numero);
+            List<Conteudo> conteudosAtivos = getConteudos(categoria, numero);
 
             if (conteudosAtivos.isEmpty()) {
                 log.info("📭 Nenhum agendamento ativo para API {}/{}", categoria, numero);
