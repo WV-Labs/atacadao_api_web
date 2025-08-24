@@ -84,7 +84,6 @@
     }
     /* Debug info */
     .debug-info {
-      display: none;
       position: fixed;
       bottom: 10px;
       left: 10px;
@@ -95,6 +94,7 @@
       font-size: 12px;
       z-index: 1000;
       font-family: monospace;
+      width: 50%;
     }
 
     /* Status verificação */
@@ -229,13 +229,6 @@
                  background-color: #000;'" id="app">
 <!-- Debug Info -->
 <div id="debug-info" class="debug-info show">
-  <div><strong>🖥️ TV:</strong> <span id="debug-tv">Loading...</span></div>
-  <div><strong>📋 Conteúdo:</strong> <span id="debug-content">Loading...</span></div>
-  <div><strong>⏰ Última verificação:</strong> <span id="debug-last-check">Nunca</span></div>
-  <div><strong>⏱️ Próxima em:</strong> <span id="debug-countdown">30s</span></div>
-  <div><strong>📊 Status:</strong> <span id="debug-status">Iniciando...</span></div>
-  <div><strong>🔄 Verificações:</strong> <span id="debug-checks">0</span></div>
-  <div><strong>❌ Erros:</strong> <span id="debug-errors">0</span></div>
 </div>
 
 <!-- TV Info -->
@@ -251,33 +244,25 @@
 
 <div id="main-content">
   <!-- Imagem -->
-  <div class="image-container" th:id="divImagem" th:if="${tipoConteudo == 1}" th:align="center">
-    <img th:src="${caminhoCompletoArquivo}" alt="Conteúdo de imagem">
+  <div class="image-container" th:id="divImagem"  th:align="center">
+    <img id="imagem" alt="Conteúdo de imagem">
   </div>
 
   <!-- Video -->
-  <div class="video-container" th:id="divVideo" th:if="${tipoConteudo == 2}" th:align="center">
-     <video autoplay muted loop controls
-           th:onloadstart="'console.log(\'Iniciando carregamento do vídeo:\', this.currentSrc);'"
-           th:oncanplay="'console.log(\'Vídeo pronto para reproduzir:\', this.currentSrc);'"
-           th:onerror="'console.error(\'Erro no vídeo:\', this.error); document.getElementById(\'media-debug\').classList.add(\'show\');'">
-
-      <!-- Múltiplas sources para compatibilidade -->
-      <source th:src="${caminhoCompletoArquivo}" type="video/mp4">
-      <source th:src="${caminhoCompletoArquivo}" type="video/webm">
-      <source th:src="${caminhoCompletoArquivo}" type="video/ogg">
-
-      <!-- Fallback -->
-      <p>Seu navegador não suporta vídeos em HTML5.</p>
-      <p>Tentando carregar: <span th:text="${caminhoCompletoArquivo}">arquivo não encontrado</span></p>
+  <div class="video-container" th:id="divVideo" th:align="center">
+    <video id="video" controls playsinline autoplay muted loop
+           th:onloadstart="'debugLog(\'Iniciando carregamento do vídeo:\', this.currentSrc);'"
+           th:onerror="'debugLog(\'Erro no vídeo:\', this.error); document.getElementById(\'debug-info\').classList.add(\'show\');'">
+      <source id="sourceVideo" type="video/mp4">
     </video>
+
   </div>
 
   <!-- Tabela de Preços -->
-  <div class="d-flex gap-4" th:id="tabelaPreco" th:if="${tipoConteudo == 3}">
+  <div class="d-flex gap-4 tabela-preco" th:id="tabelaPreco" >
     <div class="col-4"></div>
     <div class="col-8 d-flex flex-column gap-4 px-4 px-lg-5 mt-4">
-
+      <input type="hidden" name="idAgendamentoPrioritario" id="idAgendamentoPrioritario" value="0">
       <!-- Cabeçalho Categoria -->
       <div class="w-100 pt-2 d-flex align-items-center">
         <div class="d-flex justify-content-center align-items-center w-100 bg-dark bg-opacity-50 rounded-4 border border-2 border-warning py-2">
@@ -289,32 +274,7 @@
       <div class="w-100">
         <div class="produtos" id="lista-produtos">
           <!-- Produto renderizado via Thymeleaf -->
-          <div class="produto-item rounded-3 small"
-               th:each="produto, stat : ${produtos}"
-               th:classappend="${stat.index % 2 == 0} ? 'linha' : ''">
-            <div class="d-flex flex-column gap-1 justify-content-start align-items-start ">
-              <div class="d-flex align-items-end gap-4 ">
-                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal" th:text="${produto.nome.trim()}"></h3>
-                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal">-</h3>
-                <h5 class="text-white fs-1 m-0 fw-normal" th:text="${produto.abreviacaoUM}">kg</h5>
-              </div>
-            </div>
-            <div class="d-flex align-items-end gap-3 text-end">
-              <div th:if="${produto.precoPromocao > 0}">
-                <p class="small text-white mb-1">
-                  De: <s>R$ <span th:text="${#numbers.formatDecimal(produto.preco, 1, 'POINT', 2, 'COMMA')}">0,00</span></s>
-                </p>
-                <p class="fs-1 text-white mb-0">
-                  Por: R$ <span th:text="${#numbers.formatDecimal(produto.precoPromocao, 1, 'POINT', 2, 'COMMA')}">0,00</span>
-                </p>
-              </div>
-              <div th:unless="${produto.precoPromocao > 0}">
-                <p class="preco fs-1 text-white mb-0">
-                  R$ <span th:text="${#numbers.formatDecimal(produto.preco, 1, 'POINT', 2, 'COMMA')}">0,00</span>
-                </p>
-              </div>
-            </div>
-          </div>
+
           <!-- Caso nenhum produto -->
           <div th:if="${#lists.isEmpty(produtos)}" class="text-center text-gray-500">
             <h3>📦 Nenhum produto encontrado</h3>
@@ -339,8 +299,27 @@
     conteudoDescricao: /*[[${conteudoDescricao}]]*/ '',
     agendamentosAtivos: /*[[${agendamentosAtivos}]]*/ 0,
     qtdeLinhas: /*[[${qtdeLinhas}]]*/ 8,
-    caminhoArquivo: /*[[${caminhoCompletoArquivo}]]*/ ''
+    caminhoArquivo: /*[[${caminhoCompletoArquivo}]]*/ '',
+    repeticaoPreco: 0,
+    serverIP: /*[[${serverIP}]]*/ 'localhost'
   };
+  function getServerURL() {
+    const hostname = window.location.hostname;
+    const port = window.location.port || '8081';
+
+    // Detecta se está rodando localmente
+    const isLocal = hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname.startsWith('192.168.') ||
+            hostname.startsWith('10.') ||
+            hostname.startsWith('172.');
+    if (isLocal && hostname === 'localhost') {
+      return `localhost`;
+    } else {
+      // Para TV ou acesso remoto, usa o IP atual
+      return `${TV_CONFIG.serverIP}`;
+    }
+  }
 
   console.log('🎯 TV Configurada:', TV_CONFIG);
   console.log('📦 Categoria atual:', TV_CONFIG.categoria);
@@ -434,7 +413,6 @@
   // Registra que a TV está ativa
   async function registrarAtividade() {
     try {
-      /*const url = `${TV_CONFIG.baseUrl}/api/tv/${TV_CONFIG.categoria}/${TV_CONFIG.numero}/abrir`;*/
       const url = `/api-tv/api/tv/${TV_CONFIG.categoria}/${TV_CONFIG.numero}/abrir`;
 
       await fetch(url, {
@@ -484,6 +462,7 @@
       }
 
       const status = await response.json();
+      console.log(status);
       console.log(`Status recebido - Deve exibir: ${status.deveExibirConteudo}, Agendamentos: ${status.agendamentosAtivos}`, 'info');
 
       // Atualiza interface
@@ -562,8 +541,6 @@
       loading.classList.add('show');
       loading.innerHTML = `<div>🔄 ${motivo}<br>Recarregando...</div>`;
     }
-
-
   }
 
   function clearAllIntervals() {
@@ -582,52 +559,138 @@
   }
 
   // === ROLAGEM DE PRODUTOS COM FADE ===
-  function inicializarRolagemProdutos() {
-    const items = document.querySelectorAll(".produto-item");
-    if (items.length === 0) return;
+  function inicializarRolagemProdutos(produtos) {
+    const tabelaProdutos = document.getElementById('lista-produtos');
+      tabelaProdutos.innerHTML=``;
+      produtos.forEach((produto, index) => {
+        tabelaProdutos.innerHTML +=`
+        <div class="produto-item rounded-3 small ${index % 2 == 0 ? 'linha' : ''}">
+            <div class="d-flex flex-column gap-1 justify-content-start align-items-start ">
+              <div class="d-flex align-items-end gap-4 ">
+                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal">${produto.nome.trim()}</h3>
+                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal">-</h3>
+                <h5 class="text-white fs-1 m-0 fw-normal" >${produto.abreviacaoUM}</h5>
+              </div>
+            </div>
+            <div class="d-flex align-items-end gap-3 text-end">
+              <div>
+                <p class="preco fs-1 text-white mb-0">
+                  R$ <span>${produto.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+      })
 
-    console.log(`📦 Iniciando fade de ${items.length} produtos`, 'info');
+      const items = document.querySelectorAll(".produto-item");
+      if (items.length === 0) return;
 
-    const step = parseInt(`${TV_CONFIG.qtdeLinhas}`, 10);
-    let currentIndex = 0;
-    console.log(`📦 Obtendo tamanho do bloco de ${TV_CONFIG.qtdeLinhas}`, 'info');
-    function mostrarBloco(index) {
-      console.log(`📦 Vai exibir bloco`, 'info');
-      // Esconde todos
-      items.forEach(item => item.classList.remove("mostrar"));
+      //console.log(`📦 Iniciando fade de ${items.length} produtos`, 'info');
 
-      // Mostra de index até index+step
-      console.log(`📦 Vai montar bloco`, 'info');
-      for (let i = index; i < index + step && i < items.length; i++) {
-        if(i==index){
-          console.log(`📦 Vai exibir do `+ i + ` até ` + index + step, 'info');
+      const step = parseInt(`${TV_CONFIG.qtdeLinhas}`, 10);
+      let currentIndex = 0;
+      function mostrarBloco(index) {
+        // Esconde todos
+        items.forEach(item => item.classList.remove("mostrar"));
+        for (let i = index; i < index + step && i < items.length; i++) {
+          items[i].classList.add("mostrar");
         }
-        items[i].classList.add("mostrar");
       }
-    }
 
-    // Limpa interval anterior se existir
-    if (rolagemInterval) {
-      clearInterval(rolagemInterval);
-    }
+      // Limpa interval anterior se existir
+      if (rolagemInterval) {
+        clearInterval(rolagemInterval);
+      }
 
-    // Mostra primeiro bloco
-    mostrarBloco(currentIndex);
+      // Mostra primeiro bloco
+      mostrarBloco(currentIndex);
 
-    // Troca blocos a cada 8s
-    rolagemInterval = setInterval(() => {
-      console.log(`📦 Entrou para verificar se exibe próximo bloco `, 'info');
-      if (!isRedirecting) {
-        currentIndex += step;
-        console.log(`📦 Atual é ` + currentIndex, 'info');
-        console.log(`📦 Total é ` + items.length, 'info');
-        if (currentIndex >= items.length) {
-          currentIndex = 0; // volta para o início
+      // Troca blocos a cada 8s
+      rolagemInterval = setInterval(() => {
+        //console.log(`📦 Entrou para verificar se exibe próximo bloco `, 'info');
+        if (!isRedirecting) {
+          currentIndex += step;
+          if (currentIndex >= items.length) {
+            currentIndex = 0; // volta para o início
+          }
+          mostrarBloco(currentIndex);
         }
-        console.log(`📦 Vai montar bloco novo depois de 8 s `, 'info');
-        mostrarBloco(currentIndex);
+      }, 8000);
+  }
+
+  function verificaTipoConteudo() {
+    let idAgendamentoPrioritario = $('#idAgendamentoPrioritario').val();
+    if(TV_CONFIG.tipoConteudo==3 && TV_CONFIG.repeticaoPreco >= 2 ){
+      idAgendamentoPrioritario=0;
+      debugLog(`🔄 Reset ID por repetição: ${idAgendamentoPrioritario} e ${TV_CONFIG.repeticaoPreco}`);
+    }
+    debugLog(`🔍 Verificando Agendamento. ID: ${idAgendamentoPrioritario}`);
+    const server = getServerURL();
+    const url = `http://${server}:8081/api-tv/interno/${TV_CONFIG.categoria}/${TV_CONFIG.numero}/${idAgendamentoPrioritario}`;
+    debugLog(`📡 Chamando: ${url}`);
+    $.ajax({
+      url: url,
+      method: "GET",
+      dataType: 'json'
+    })
+    .then((response) => {
+      debugLog(`✅ Resposta recebida: ${response.length} itens`);
+      debugLog(`📊 Tipo: ${response[0].tipoConteudo}`);
+
+      if(idAgendamentoPrioritario != response[0].idAgendamentoPrioritario){
+        console.log("Mudando agendamento: "+ idAgendamentoPrioritario);
+        debugLog(`🔄 Mudando agendamento: ${idAgendamentoPrioritario} → ${response[0].idAgendamentoPrioritario}`);
+
+        $('#idAgendamentoPrioritario').val(response[0].idAgendamentoPrioritario);
+        TV_CONFIG.tipoConteudo=response[0].tipoConteudo;
+        TV_CONFIG.repeticaoPreco=0;
+        if (response[0].tipoConteudo === 3) {
+          debugLog(`📋 Carregando tabela de preços`);
+          $('.tabela-preco').addClass('d-block');
+          $('.tabela-preco').removeClass('d-none');
+          $('.video-container').removeClass('d-block');
+          $('.video-container').addClass('d-none');
+          $('.image-container').removeClass('d-block');
+          $('.image-container').addClass('d-none');
+          console.log("**** Carregando tabela ******");
+          inicializarRolagemProdutos(response);
+        } else if (response[0].tipoConteudo === 2) {
+          $('.video-container').addClass('d-block');
+          $('.video-container').removeClass('d-none');
+          $('.image-container').removeClass('d-block');
+          $('.image-container').addClass('d-none');
+          $('.tabela-preco').removeClass('d-block');
+          $('.tabela-preco').addClass('d-none');
+          debugLog(`📋 Carregando video`);
+          console.log("**** Carregando video ******");
+          debugLog(response[0].caminhoImagemVideo);
+          console.log("SRC = " + response[0].caminhoImagemVideo);
+          $('#sourceVideo').attr('src', response[0].caminhoImagemVideo);
+          $('#video')[0].load();
+        } else {
+          debugLog(`📋 Carregando imagem`);
+          $('.image-container').addClass('d-block');
+          $('.image-container').removeClass('d-none');
+          $('.video-container').removeClass('d-block');
+          $('.video-container').addClass('d-none');
+          $('.tabela-preco').removeClass('d-block');
+          $('.tabela-preco').addClass('d-none');
+          console.log("**** Carregando imagem ******");
+          debugLog("SRC = " + response[0].caminhoImagemVideo);
+          console.log("SRC = " + response[0].caminhoImagemVideo);
+          $('#imagem').attr('src', response[0].caminhoImagemVideo);
+        }
+      }else{
+        TV_CONFIG.repeticaoPreco++;
       }
-    }, 8000);
+      debugLog(`🔂 Repetição: ${TV_CONFIG.repeticaoPreco}`);
+      console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
+    })
+    .catch((xhr, status, error) => {
+      debugLog(`❌ ERRO AJAX: ${status} - ${error}`);
+      debugLog(`📡 Status: ${xhr.status}`);
+    });
   }
 
   // === INICIALIZAÇÃO ===
@@ -645,40 +708,14 @@
     // Inicia contador visual
     iniciarContador();
 
-    // Inicia rolagem de produtos se necessário
-    if (TV_CONFIG.tipoConteudo === 3) {
-      setTimeout(inicializarRolagemProdutos, 1000);
-    }
-
-    // === CONFIGURAÇÃO DA VERIFICAÇÃO AUTOMÁTICA ===
-    console.log('⏰ Configurando verificação automática a cada 30s', 'info');
+    verificaTipoConteudo();
 
     verificacaoInterval = setInterval(() => {
-      if (!isRedirecting) {
-        console.log('🔔 Executando verificação automática', 'info');
-        verificarStatusAgendamento();
-      }
+      verificaTipoConteudo();
     }, 30000); // 30 segundos
 
-    // Primeira verificação após 5 segundos
-    setTimeout(() => {
-      console.log('🎬 Executando primeira verificação', 'info');
-      verificarStatusAgendamento();
-    }, 3600000); //30000); //5000);
     console.log('✅ TV inicializada com sucesso', 'success');
   });
-
-  // === LIMPEZA AO SAIR ===
-  window.addEventListener('beforeunload', function() {
-    console.log('👋 Limpando intervals antes de sair', 'info');
-    clearAllIntervals();
-  });
-
-  // === FUNÇÕES DE DEBUG MANUAL ===
-  window.forcarVerificacao = function() {
-    console.log('🔧 Verificação manual forçada', 'info');
-    verificarStatusAgendamento();
-  };
 
   window.debugTV = function() {
     console.log('=== 🔍 DEBUG TV ===');
@@ -690,20 +727,11 @@
     console.log('Total erros:', totalErros);
     console.log('=================');
   };
-
-  window.forcarReload = function() {
-    console.log('🔧 Reload manual forçado', 'warn');
-    recarregarConteudo('Reload manual');
-  };
-
-  window.forcarStandby = function() {
-    console.log('🔧 Standby manual forçado', 'warn');
-    redirecionarParaStandby('Standby manual');
-  };
 </script>
 <!-- Bootstrap JS -->
 <script th:src="@{/img/js/popper.min.js}"></script>
 <script th:src="@{/img/js/bootstrap.min.js}"></script>
+<script th:src="@{/img/js/jquery-3.7.1.min.js}"></script>
 <button id="exitFullscreenBtn" style="position:fixed;top:10px;right:10px;width:40px;height:40px;opacity:0;z-index:999;border:none;background:none;cursor:pointer;"></button>
 <script>
     document.getElementById("exitFullscreenBtn").addEventListener("click", function () {
@@ -713,6 +741,39 @@
           document.documentElement.requestFullscreen();
         }
     });
+    function criarDebugOverlay() {
+      const debugDiv = document.createElement('div');
+      debugDiv.id = 'tv-debug-overlay';
+      debugDiv.style.cssText = `
+        position: fixed;
+        top: 50px;
+        right: 10px;
+        background: rgba(255,0,0,0.9);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 10000;
+        max-width: 600px;
+        display: block;
+    `;
+      document.body.appendChild(debugDiv);
+      return debugDiv;
+    }
+
+    const debugOverlay = criarDebugOverlay();
+
+    function debugLog(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      debugOverlay.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+
+      // Limita a 10 últimas mensagens
+      const lines = debugOverlay.querySelectorAll('div');
+      if (lines.length > 10) {
+        lines[0].remove();
+      }
+    }
 </script>
 </body>
 </html>

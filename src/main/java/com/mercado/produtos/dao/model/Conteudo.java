@@ -33,6 +33,9 @@ public class Conteudo {
   @Column(name = "nome_midia")
   private String nomeMidia;
 
+  @Transient
+  private Long idAgendamentoPrioritario;
+
   // Construtores
   public Conteudo() {}
 

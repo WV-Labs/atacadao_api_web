@@ -66,3 +66,6 @@ build/
 !/src/main/resources/static/
 !/local-repo/
 !/.idea/
+/target/
+/src/main/resources/static/img/
+!/src/main/resources/static/favicon.ico

@@ -31,6 +31,10 @@ public class TVService {
      * Implementa lógica de priorização de agendamentos sobrepostos
      */
     public List<Conteudo> exibirConteudo(String categoria, Integer numero) {
+        return exibirConteudo(categoria, numero, 0L);
+    }
+
+    public List<Conteudo> exibirConteudo(String categoria, Integer numero, Long idAgendamentoPrioritario) {
         String chaveTV = categoria + "/" + numero;
         ultimasVerificacoes.put(chaveTV, LocalDateTime.now());
 
@@ -64,10 +68,11 @@ public class TVService {
 
         if (agendamentoPrioritario != null) {
             System.out.println("🎯 Agendamento prioritário: " + agendamentoPrioritario.getTitulo());
-
             // Retorna o conteúdo do agendamento prioritário
             List<Conteudo> conteudos = new ArrayList<>();
-            conteudos.add(agendamentoPrioritario.getTerminalConteudo().getConteudo());
+            Conteudo conteudo = agendamentoPrioritario.getTerminalConteudo().getConteudo();
+            conteudo.setIdAgendamentoPrioritario(agendamentoPrioritario.getId());
+            conteudos.add(conteudo);
             return conteudos;
         }
 
