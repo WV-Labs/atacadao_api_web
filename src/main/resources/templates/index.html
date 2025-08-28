@@ -630,16 +630,66 @@
     const server = getServerURL();
     const url = `http://${server}:8081/api-tv/interno/${TV_CONFIG.categoria}/${TV_CONFIG.numero}/${idAgendamentoPrioritario}`;
     debugLog(`📡 Chamando: ${url}`);
+
+    // TENTATIVA 1: XMLHttpRequest
+    const xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            processarRespostaSamsung(response, idAgendamentoPrioritario);
+          } catch (e) {
+            debugLog(`Erro ao parsear JSON: ${e.message}`);
+            // FALLBACK: tenta jQuery AJAX
+            tentarAjaxFallback(url, idAgendamentoPrioritario);
+          }
+        } else {
+          debugLog(`Erro XHR: ${xhr.status} - ${xhr.statusText}`);
+          // FALLBACK: tenta jQuery AJAX
+          tentarAjaxFallback(url, idAgendamentoPrioritario);
+        }
+      }
+    };
+    xhr.onerror = function() {
+      debugLog(`Erro de rede XHR`);
+      // FALLBACK: tenta jQuery AJAX
+      tentarAjaxFallback(url, idAgendamentoPrioritario);
+    };
+    xhr.ontimeout = function() {
+      debugLog(`Timeout XHR`);
+      // FALLBACK: tenta jQuery AJAX
+      tentarAjaxFallback(url, idAgendamentoPrioritario);
+    };
+    xhr.timeout = 15000;
+    xhr.open('GET', url, true);
+    xhr.send();
+  }
+
+  // FALLBACK: jQuery AJAX (sua versão original)
+  function tentarAjaxFallback(url, idAgendamentoPrioritario) {
+    debugLog(`Fallback: tentando jQuery AJAX`);
     $.ajax({
       url: url,
       method: "GET",
-      dataType: 'json'
+      dataType: 'json',
+      timeout: 15000
     })
-    .then((response) => {
-      debugLog(`✅ Resposta recebida: ${response.length} itens`);
-      debugLog(`📊 Tipo: ${response[0].tipoConteudo}`);
+    .done(function(response) {
+      processarRespostaSamsung(response, idAgendamentoPrioritario);
+    })
+    .fail(function(xhr, status, error) {
+      debugLog(`ERRO AJAX Final: ${status} - ${error}`);
+      debugLog(`Status: ${xhr.status}`);
+    });
+  }
 
-      if(idAgendamentoPrioritario != response[0].idAgendamentoPrioritario){
+  // PROCESSA RESPOSTA COM CACHE BLOB + FALLBACKS
+  function processarRespostaSamsung(response, idAgendamentoPrioritario) {
+    debugLog(`Resposta recebida: ${response.length} itens`);
+    debugLog(`Tipo: ${response[0].tipoConteudo}`);
+
+    if(idAgendamentoPrioritario != response[0].idAgendamentoPrioritario){
         console.log("Mudando agendamento: "+ idAgendamentoPrioritario);
         debugLog(`🔄 Mudando agendamento: ${idAgendamentoPrioritario} → ${response[0].idAgendamentoPrioritario}`);
 
@@ -669,23 +719,7 @@
           console.log("**** Carregando video ******");
           debugLog(response[0].caminhoImagemVideo);
           console.log("SRC = " + response[0].caminhoImagemVideo);
-          if (videoCache[videoUrl]) {
-            $('#sourceVideo').attr('src', videoCache[videoUrl]);
-            $('#video')[0].load();
-            $('#video')[0].play();
-            return;
-          }else {
-            fetch(videoUrl)
-                    .then(res => res.blob())
-                    .then(blob => {
-                      const objectURL = URL.createObjectURL(blob);
-                      videoCache[videoUrl] = objectURL;
-                      $('#sourceVideo').attr('src', objectURL);
-                      $('#video')[0].load();
-                      $('#video')[0].play();
-                    })
-                    .catch(err => console.error('Erro ao carregar vídeo:', err));
-          }
+          carregarVideoComCacheSamsung(videoUrl);
         } else {
           debugLog(`📋 Carregando imagem`);
           $('.image-container').addClass('d-block');
@@ -700,23 +734,185 @@
           $('#imagem').attr('src', response[0].caminhoImagemVideo);
         }
       }else{
-        TV_CONFIG.repeticaoPreco++;
+      TV_CONFIG.repeticaoPreco++;
+    }
+    debugLog(`Repetição: ${TV_CONFIG.repeticaoPreco}`);
+    console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
+  }
+  // CARREGA VÍDEO COM CACHE BLOB + FALLBACKS
+  function carregarVideoComCacheSamsung(videoUrl) {
+    debugLog(`SAMSUNG: Carregando vídeo com cache`);
+
+    // Se já está em cache, usa
+    if (videoCache[videoUrl]) {
+      debugLog(`SAMSUNG: Usando vídeo do cache`);
+      const video = $('#video')[0];
+      const source = $('#sourceVideo')[0];
+      video.pause();
+      source.src = videoCache[videoUrl];
+      video.load();
+      video.addEventListener('canplay', function(){
+        tentarPlaySamsung(video, 'CACHE');
+      }, {onde: true});
+      return;
+
+      /*$('#sourceVideo').attr('src', videoCache[videoUrl]);
+      $('#video')[0].load();
+      tentarPlaySamsung($('#video')[0], 'CACHE');
+      return;*/
+    }
+
+    // Tenta baixar para cache
+    debugLog(`SAMSUNG: Forçando donwload para cache`);
+    fetch(videoUrl)
+            .then(response => {
+                      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                      debugLog(`SAMSUNG: Download OK, criando BLOB`);
+                      return response.blob();
+                    }
+            )
+            .then(blob => {
+              debugLog(`SAMSUNG: BLOB criado - ${blob.size} bytes`);
+              try{
+                const objectURL = URL.createObjectURL(blob);
+                videoCache[videoUrl] = objectURL;
+                debugLog(`SAMSUNG: CAche salvo - ${objectURL}`);
+
+                const video = $('#video')[0];
+                const source = $('#sourceVideo')[0];
+                video.pause();
+                source.src = objectURL;
+                video.load();
+                video.addEventListener('canplay', function(){
+                  tentarPlaySamsung(video, 'CACHE');
+                }, {onde: true});
+              } catch(e) {
+                debugLog(`SAMSUNG: Erro ao criar ObjectURL - ${e.message}`);
+                carregarVideoSemCacheSamsung(videoUrl);
+              }
+            })
+/*
+    // TENTATIVA 1: XMLHttpRequest para blob
+    const xhrVideo = new XMLHttpRequest();
+    xhrVideo.open('GET', videoUrl, true);
+    xhrVideo.responseType = 'blob';
+    xhrVideo.timeout = 30000; // 30s para vídeo
+
+    xhrVideo.onload = function() {
+      if (xhrVideo.status === 200) {
+        try {
+          const blob = xhrVideo.response;
+          const objectURL = URL.createObjectURL(blob);
+          videoCache[videoUrl] = objectURL;
+          debugLog(`SAMSUNG: Cache criado - ${blob.size} bytes`);
+
+          $('#sourceVideo').attr('src', objectURL);
+          $('#video')[0].load();
+          tentarPlaySamsung($('#video')[0], 'CACHE');
+        } catch (e) {
+          debugLog(`SAMSUNG: Erro ao criar blob: ${e.message}`);
+          // FALLBACK: URL direta
+          carregarVideoSemCacheSamsung(videoUrl);
+        }
+      } else {
+        debugLog(`SAMSUNG: Erro no download: ${xhrVideo.status}`);
+        // FALLBACK: URL direta
+        carregarVideoSemCacheSamsung(videoUrl);
       }
-      debugLog(`🔂 Repetição: ${TV_CONFIG.repeticaoPreco}`);
-      console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
-    })
-    .catch((xhr, status, error) => {
-      debugLog(`❌ ERRO AJAX: ${status} - ${error}`);
-      debugLog(`📡 Status: ${xhr.status}`);
-    });
+    };
+
+    xhrVideo.onerror = function() {
+      debugLog(`SAMSUNG: Erro de rede no download`);
+      // FALLBACK: URL direta
+      carregarVideoSemCacheSamsung(videoUrl);
+    };
+
+    xhrVideo.ontimeout = function() {
+      debugLog(`SAMSUNG: Timeout no download`);
+      // FALLBACK: URL direta
+      carregarVideoSemCacheSamsung(videoUrl);
+    };
+    xhrVideo.send();
+    */
   }
 
-  /*const videoListener = document.getElementById('video');
-  videoListener.addEventListener('ended', () => {
-    const novoVideo = videoListener.cloneNode(true);
-    videoListener.parentNode.replaceChild(novoVideo, videoListener);
-    novoVideo.play();
-  });*/
+  // FALLBACK: Carrega vídeo sem cache (URL direta)
+  function carregarVideoSemCacheSamsung(videoUrl) {
+    debugLog(`SAMSUNG: Carregando vídeo direto (sem cache)`);
+    $('#sourceVideo').attr('src', videoUrl);
+    $('#video')[0].load();
+    tentarPlaySamsung($('#video')[0], 'DIRETO');
+  }
+
+  // SISTEMA ROBUSTO DE PLAY PARA SAMSUNG
+  function tentarPlaySamsung(video, modo) {
+    let tentativas = 0;
+    const maxTentativas = 8;
+    let videoCarregado = false;
+
+    const tentarPlay = () => {
+      if (tentativas >= maxTentativas || videoCarregado) {
+        if (tentativas >= maxTentativas) {
+          debugLog(`SAMSUNG ${modo}: Falha após ${maxTentativas} tentativas`);
+
+          // Se era cache e falhou, tenta modo direto
+          if (modo === 'CACHE') {
+            debugLog(`SAMSUNG: Cache falhou, tentando modo direto`);
+            // Aqui você implementaria fallback para URL original
+          }
+        }
+        return;
+      }
+
+      tentativas++;
+      debugLog(`SAMSUNG ${modo}: Tentativa de play #${tentativas}`);
+
+      // Força configurações
+      video.muted = true;
+      video.autoplay = true;
+      video.loop = true;
+
+      try {
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise
+                  .then(() => {
+                    debugLog(`SAMSUNG ${modo}: Play OK na tentativa ${tentativas}`);
+                    videoCarregado = true;
+                  })
+                  .catch(error => {
+                    debugLog(`SAMSUNG ${modo}: Tentativa ${tentativas} falhou: ${error.message}`);
+                    if (tentativas < maxTentativas) {
+                      setTimeout(tentarPlay, tentativas * 500);
+                    }
+                  });
+        } else {
+          debugLog(`SAMSUNG ${modo}: Play executado (sem promise)`);
+          videoCarregado = true;
+        }
+      } catch (e) {
+        debugLog(`SAMSUNG ${modo}: Erro no play: ${e.message}`);
+        if (tentativas < maxTentativas) {
+          setTimeout(tentarPlay, tentativas * 500);
+        }
+      }
+    };
+
+    // Event listeners
+    video.addEventListener('canplay', () => {
+      if (!videoCarregado) setTimeout(tentarPlay, 200);
+    });
+    video.addEventListener('playing', () => {
+      videoCarregado = true;
+      debugLog(`SAMSUNG ${modo}: Reproduzindo`);
+    });
+    video.addEventListener('error', (e) => {
+      debugLog(`SAMSUNG ${modo}: Erro no vídeo`);
+    });
+    // Primeira tentativa
+    setTimeout(tentarPlay, 1000);
+  }
 
   // === INICIALIZAÇÃO ===
   document.addEventListener("DOMContentLoaded", function () {
@@ -794,7 +990,7 @@
 
       // Limita a 10 últimas mensagens
       const lines = debugOverlay.querySelectorAll('div');
-      if (lines.length > 10) {
+      if (lines.length > 30) {
         lines[0].remove();
       }
     }
