@@ -402,4 +402,18 @@ public class TVService {
     public void debugAgendamentoEspecifico(String categoria, Integer numero) {
         // Método mantido conforme original
     }
+
+    public List<Conteudo> getConteudos(String categoria, Integer numero) {
+        return getConteudos(categoria, numero, 0L);
+    }
+
+    public List<Conteudo> getConteudos(String categoria, Integer numero, Long idAgendamentoPrioritario) {
+        // Registra que a TV está verificando o sistema
+        registrarVerificacaoTV(categoria, numero);
+
+        // Verifica se deve exibir conteúdo agendado (COM LÓGICA DE PRIORIZAÇÃO)
+        List<Conteudo> conteudos = exibirConteudo(categoria, numero, idAgendamentoPrioritario);
+        return conteudos;
+    }
+
 }

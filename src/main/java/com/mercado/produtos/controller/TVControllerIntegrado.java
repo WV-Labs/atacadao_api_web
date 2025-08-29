@@ -1,5 +1,8 @@
 package com.mercado.produtos.controller;
 
+import static com.mercado.produtos.general.Constants.TCOFERTA;
+import static com.mercado.produtos.general.Constants.TCTABELAPRECO;
+
 import com.mercado.produtos.dao.dto.ProdutoDto;
 import com.mercado.produtos.dao.model.Conteudo;
 import com.mercado.produtos.service.ProdutoApiService;
@@ -68,7 +71,7 @@ public class TVControllerIntegrado {
         log.info("🔍 Verificando agendamentos para categoria '{}' da TV '{}'", categoria, numero);
 
         try {
-            List<Conteudo> conteudos = getConteudos(categoria, numero, idAgendamentoPrioritario);
+            List<Conteudo> conteudos = tvService.getConteudos(categoria, numero, idAgendamentoPrioritario);
             if (conteudos.isEmpty()) {
                 log.info("📭 Nenhum agendamento ativo para {}/{} - redirecionando para standby", categoria, numero);
                 return null;
@@ -92,7 +95,7 @@ public class TVControllerIntegrado {
         log.info("🔍 Verificando agendamentos para categoria '{}' da TV '{}'", categoria, numero);
 
         try {
-            List<Conteudo> conteudos = getConteudos(categoria, numero);
+            List<Conteudo> conteudos = tvService.getConteudos(categoria, numero);
             if (conteudos.isEmpty()) {
                 log.info("📭 Nenhum agendamento ativo para {}/{} - redirecionando para standby", categoria, numero);
                 return "redirect:/tv?categoria=" + categoria + "&numero=" + numero;
@@ -141,44 +144,28 @@ public class TVControllerIntegrado {
         return produtoDtos;
     }
 
-    private List<Conteudo> getConteudos(String categoria, Integer numero) {
-        return getConteudos(categoria, numero, 0L);
-    }
-
-    private List<Conteudo> getConteudos(String categoria, Integer numero, Long idAgendamentoPrioritario) {
-        // Registra que a TV está verificando o sistema
-        tvService.registrarVerificacaoTV(categoria, numero);
-
-        // Verifica se deve exibir conteúdo agendado (COM LÓGICA DE PRIORIZAÇÃO)
-        List<Conteudo> conteudos = tvService.exibirConteudo(categoria, numero, idAgendamentoPrioritario);
-        return conteudos;
-    }
-
     private List<ProdutoDto> prepararModelParaConteudo(Model model, Conteudo conteudo, String categoria, Integer numero) {
         List<ProdutoDto> produtoDtos = new ArrayList<>();
 
         // Tipo 3 = conteúdo de produtos (busca na API)
-        if (conteudo.getTipoConteudo() == 3) {
+        if (conteudo.getTipoConteudo() == TCTABELAPRECO) {
             try {
                 // *** IMPORTANTE: Busca produtos para a categoria CORRETA ***
                 produtoDtos = produtoApiService.buscarProdutosRemoto(categoria, numero);
+                setModelProdutoDto(model, conteudo, categoria, numero, produtoDtos);
+            } catch (Exception e) {
+                log.warn("⚠️ Erro ao buscar produtos para {}/{}: {}", categoria, numero, e.getMessage());
 
-                if (!produtoDtos.isEmpty()) {
-                    ProdutoDto primeiro = produtoDtos.get(0);
-                    model.addAttribute("descCategoria", primeiro.getDescricaoCategoria());
-                    model.addAttribute("tipoConteudo", primeiro.getTipoConteudo());
-                    model.addAttribute("caminhoCompletoArquivo",
-                            primeiro.getCaminhoImagemVideo() != null ? primeiro.getCaminhoImagemVideo() : "");
-
-                    log.info("📦 Produtos carregados: {} itens para {}/{}", produtoDtos.size(), categoria, numero);
-                } else {
-                    // Sem produtos, usa dados do conteúdo mas com categoria correta
-                    model.addAttribute("descCategoria", categoria.toUpperCase());
-                    model.addAttribute("tipoConteudo", conteudo.getTipoConteudo());
-                    model.addAttribute("caminhoCompletoArquivo", conteudo.getNomeMidia() != null ? conteudo.getNomeMidia() : "");
-
-                    log.warn("⚠️ Nenhum produto encontrado para {}/{}, usando dados padrão", categoria, numero);
-                }
+                // Fallback para dados do conteúdo com categoria correta
+                model.addAttribute("descCategoria", categoria.toUpperCase());
+                model.addAttribute("tipoConteudo", conteudo.getTipoConteudo());
+                model.addAttribute("caminhoCompletoArquivo", conteudo.getNomeMidia() != null ? conteudo.getNomeMidia() : "");
+            }
+        } if (conteudo.getTipoConteudo() == TCOFERTA) {
+            // Tipo 4 = Oferta (busca API tabela conteudo_tabela_preco
+            try {
+                produtoDtos = produtoApiService.buscarProdutosOferta( conteudo.getId());
+                setModelProdutoDto(model, conteudo, categoria, numero, produtoDtos);
             } catch (Exception e) {
                 log.warn("⚠️ Erro ao buscar produtos para {}/{}: {}", categoria, numero, e.getMessage());
 
@@ -216,6 +203,25 @@ public class TVControllerIntegrado {
         return produtoDtos;
     }
 
+    private static void setModelProdutoDto(Model model, Conteudo conteudo, String categoria, Integer numero, List<ProdutoDto> produtoDtos) {
+        if (!produtoDtos.isEmpty()) {
+            ProdutoDto primeiro = produtoDtos.get(0);
+            model.addAttribute("descCategoria", primeiro.getDescricaoCategoria());
+            model.addAttribute("tipoConteudo", primeiro.getTipoConteudo());
+            model.addAttribute("caminhoCompletoArquivo",
+                    primeiro.getCaminhoImagemVideo() != null ? primeiro.getCaminhoImagemVideo() : "");
+
+            log.info("📦 Produtos carregados: {} itens para {}/{}", produtoDtos.size(), categoria, numero);
+        } else {
+            // Sem produtos, usa dados do conteúdo mas com categoria correta
+            model.addAttribute("descCategoria", categoria.toUpperCase());
+            model.addAttribute("tipoConteudo", conteudo.getTipoConteudo());
+            model.addAttribute("caminhoCompletoArquivo", conteudo.getNomeMidia() != null ? conteudo.getNomeMidia() : "");
+
+            log.warn("⚠️ Nenhum produto encontrado para {}/{}, usando dados padrão", categoria, numero);
+        }
+    }
+
     /**
      * API para detectar configuração da TV baseada na URL
      */
@@ -236,7 +242,7 @@ public class TVControllerIntegrado {
             log.info("🔌 API chamada para produtos: {}/{}", categoria, numero);
 
             // Registra verificação da TV
-            List<Conteudo> conteudosAtivos = getConteudos(categoria, numero);
+            List<Conteudo> conteudosAtivos = tvService.getConteudos(categoria, numero);
 
             if (conteudosAtivos.isEmpty()) {
                 log.info("📭 Nenhum agendamento ativo para API {}/{}", categoria, numero);
@@ -246,7 +252,7 @@ public class TVControllerIntegrado {
             Conteudo conteudoAtivo = conteudosAtivos.get(0);
 
             // Se é conteúdo tipo 3 (produtos), busca na API PARA A CATEGORIA CORRETA
-            if (conteudoAtivo.getTipoConteudo() == 3) {
+            if (conteudoAtivo.getTipoConteudo() == TCTABELAPRECO || conteudoAtivo.getTipoConteudo() == TCOFERTA ) {
                 // *** BUSCA PRODUTOS SEMPRE PARA A CATEGORIA DA URL ***
                 List<ProdutoDto> produtoDtos = produtoApiService.buscarProdutosRemoto(categoria, numero);
 
