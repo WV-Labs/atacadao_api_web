@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -124,21 +124,23 @@
 
 
     .oferta-container {
-
       justify-content: center;
       align-items: center;
       height: 100vh;
       background-color: #000 !important;
-
     }
 
     .oferta{
-      width: 45%;
-      height: 90vh;
+      width: 35%;
+      height: 80vh;
       background-color: #fff90d;
-      padding-inline: 70px;
       border-radius: 10px;
       position: relative;
+    }
+
+    .oferta > h1{
+      text-align: center;
+      font-weight: bold;
     }
 
     .oferta > h2 {
@@ -157,7 +159,7 @@
 
     .nome-oferta {
       width: 100%;
-      font-weight: 350;
+      font-weight: 150;
       font-size: 4rem;
       font-family: 'knewave', sans-serif;
     }
@@ -272,7 +274,7 @@
     }
 
     #ofertaArea{
-      margin-top: 40px;
+      margin-top: 0px;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -320,7 +322,6 @@
     <div class="oferta">
       <h2 class="">OFERTA</h2>
       <div id="ofertaArea">
-
       </div>
     </div>
   </div>
@@ -629,20 +630,22 @@
   function adicionarOferta(produto) {
     console.log(produto);
     const ofertaArea = document.getElementById('ofertaArea');
+    const parteInteira = Math.floor(produto.preco);
+    const parteDecimal = Math.round((produto.preco - parteInteira)*100);
     ofertaArea.innerHTML = `
     <div>
         <h3 class="nome-oferta">${produto.nome.trim()}</h3>
-        <div style="margin-top: 0px" class="d-flex flex-column align-items-start justify-content-center" margin-top: 0px>
-        <span style="font-size: 2rem;">R$</span>
-        <p class="preco-oferta mb-1">
-           ${produto.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
+        <div style="margin-top: 0px" class="d-flex flex-column align-items-start justify-content-center" >
+          <p style="font-size: 2rem; padding-left: 10px">R$</p>
+          <div class="d-flex w-100 align-items-start justify-content-center" style="margin-top: -60px; padding-inline: 30px">
+            <p class="preco-oferta mb-1 "  >${parteInteira}</p>
+            <span class="preco-oferta" style="font-size:5rem !important; margin-top: 40px; margin-left: 12px">,${parteDecimal}</span>
+          </div>
          </div>
-<span style="margin-top: 0px; top: 0px; font-weight: 10; font-size: 2rem;" >(${produto.abreviacaoUM})</span>
-           <div>
-
-            <img class="logo" src="/api-tv/img/background/logo-atacadao.png"/>
-            </div>
+         <p style="margin-top: 0px; top: 0px;  font-size: 2rem;" >(${produto.abreviacaoUM})</p>
+         <div style="margin-top: -60px; top: 0px">
+           <img class="logo" src="/api-tv/img/background/logo-atacadao.png"/>
+         </div>
     </div>`;
   }
 
