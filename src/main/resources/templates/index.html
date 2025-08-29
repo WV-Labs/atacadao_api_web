@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,6 +13,12 @@
   <meta name="auto-update-url" th:content="@{/{categoria}/{numero}(categoria=${categoria}, numero=${numero})}">
   <meta name="auto-update-target" content="#main-content, body">
   <style>
+
+    @font-face {
+      font-family: 'knewave';
+      src: url('/api-tv/img/webfonts/Knewave-Regular.ttf') format('truetype');
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -114,6 +120,55 @@
       display: none;
       background: rgba(40, 167, 69, 0.9);
       border: 2px solid #28a745;
+    }
+
+
+    .oferta-container {
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #000 !important;
+    }
+
+    .oferta{
+      width: 35%;
+      height: 80vh;
+      background-color: #fff90d;
+      border-radius: 10px;
+      position: relative;
+    }
+
+    .oferta > h1{
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .oferta > h2 {
+      font-size: 7rem !important;
+      font-weight: bold;
+      color: #FF0D23;
+    }
+
+    .logo{
+      height: auto;
+      width: 5vw;
+      position:absolute;
+      bottom: 0px;
+      right: 10px;
+    }
+
+    .nome-oferta {
+      width: 100%;
+      font-weight: 150;
+      font-size: 4rem;
+      font-family: 'knewave', sans-serif;
+    }
+
+    .preco-oferta {
+      color: #ff0d23;
+      font-size: 12rem;
+      font-weight: 100;
+      font-family: 'knewave', sans-serif;
     }
 
     @keyframes glow {
@@ -218,6 +273,13 @@
       display: flex;
     }
 
+    #ofertaArea{
+      margin-top: 0px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
     .linha{
       background-color: rgba(255, 255, 255, 0.3);
     }
@@ -254,6 +316,14 @@
       <source id="sourceVideo" type="video/mp4">
     </video>
     <input type="hidden" id="videoCaminho" />
+  </div>
+
+  <div class="oferta-container" th:id="divOferta " th:align="center">
+    <div class="oferta">
+      <h2 class="">OFERTA</h2>
+      <div id="ofertaArea">
+      </div>
+    </div>
   </div>
 
   <!-- Tabela de Preços -->
@@ -557,30 +627,55 @@
     }
   }
 
+  function adicionarOferta(produto) {
+    console.log(produto);
+    const ofertaArea = document.getElementById('ofertaArea');
+    const parteInteira = Math.floor(produto.preco);
+    const parteDecimal = Math.round((produto.preco - parteInteira)*100);
+    ofertaArea.innerHTML = `
+    <div>
+        <h3 class="nome-oferta">${produto.nome.trim()}</h3>
+        <div style="margin-top: 0px" class="d-flex flex-column align-items-start justify-content-center" >
+          <p style="font-size: 2rem; padding-left: 10px">R$</p>
+          <div class="d-flex w-100 align-items-start justify-content-center" style="margin-top: -60px; padding-inline: 30px">
+            <p class="preco-oferta mb-1 "  >${parteInteira}</p>
+            <span class="preco-oferta" style="font-size:5rem !important; margin-top: 40px; margin-left: 12px">,${parteDecimal}</span>
+          </div>
+         </div>
+         <p style="margin-top: 0px; top: 0px;  font-size: 2rem;" >(${produto.abreviacaoUM})</p>
+         <div style="margin-top: -60px; top: 0px">
+           <img class="logo" src="/api-tv/img/background/logo-atacadao.png"/>
+         </div>
+    </div>`;
+  }
+
   // === ROLAGEM DE PRODUTOS COM FADE ===
   function inicializarRolagemProdutos(produtos) {
     const tabelaProdutos = document.getElementById('lista-produtos');
       tabelaProdutos.innerHTML=``;
-      produtos.forEach((produto, index) => {
+    produtos.forEach((produto, index) => {
+      var validaProduto = produto.nome != null && produto.nome != "";
+      if(validaProduto){
         tabelaProdutos.innerHTML +=`
         <div class="produto-item rounded-3 small ${index % 2 == 0 ? 'linha' : ''}">
-            <div class="d-flex flex-column gap-1 justify-content-start align-items-start ">
+            <div th:if="${produto.abreviacaoUM != null}" class="d-flex flex-column gap-1 justify-content-start align-items-start ">
               <div class="d-flex align-items-end gap-4 ">
-                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal">${produto.nome.trim()}</h3>
-                <h3 class="text-white fs-1 text-nowrap m-0 fw-normal">-</h3>
+                <h3 class="text-white fs-2 text-nowrap m-0 fw-normal">${produto.nome != null ? produto.nome.trim() : ''}</h3>
+                <h3 class="text-white fs-2 text-nowrap m-0 fw-normal">-</h3>
                 <h5 class="text-white fs-1 m-0 fw-normal" >${produto.abreviacaoUM}</h5>
               </div>
             </div>
-            <div class="d-flex align-items-end gap-3 text-end">
+            <div th:if="${produto.nome != null}" class="d-flex align-items-end gap-3 text-end">
               <div>
                 <p class="preco fs-1 text-white mb-0">
-                  R$ <span>${produto.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  R$ <span>${produto.preco != null ? produto.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</span>
                 </p>
               </div>
             </div>
           </div>
         `;
-      })
+      }
+    })
 
       const items = document.querySelectorAll(".produto-item");
       if (items.length === 0) return;
@@ -630,16 +725,66 @@
     const server = getServerURL();
     const url = `http://${server}:8081/api-tv/interno/${TV_CONFIG.categoria}/${TV_CONFIG.numero}/${idAgendamentoPrioritario}`;
     debugLog(`📡 Chamando: ${url}`);
+
+    // TENTATIVA 1: XMLHttpRequest
+    const xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            processarRespostaSamsung(response, idAgendamentoPrioritario);
+          } catch (e) {
+            debugLog(`Erro ao parsear JSON: ${e.message}`);
+            // FALLBACK: tenta jQuery AJAX
+            tentarAjaxFallback(url, idAgendamentoPrioritario);
+          }
+        } else {
+          debugLog(`Erro XHR: ${xhr.status} - ${xhr.statusText}`);
+          // FALLBACK: tenta jQuery AJAX
+          tentarAjaxFallback(url, idAgendamentoPrioritario);
+        }
+      }
+    };
+    xhr.onerror = function() {
+      debugLog(`Erro de rede XHR`);
+      // FALLBACK: tenta jQuery AJAX
+      tentarAjaxFallback(url, idAgendamentoPrioritario);
+    };
+    xhr.ontimeout = function() {
+      debugLog(`Timeout XHR`);
+      // FALLBACK: tenta jQuery AJAX
+      tentarAjaxFallback(url, idAgendamentoPrioritario);
+    };
+    xhr.timeout = 15000;
+    xhr.open('GET', url, true);
+    xhr.send();
+  }
+
+  // FALLBACK: jQuery AJAX (sua versão original)
+  function tentarAjaxFallback(url, idAgendamentoPrioritario) {
+    debugLog(`Fallback: tentando jQuery AJAX`);
     $.ajax({
       url: url,
       method: "GET",
-      dataType: 'json'
+      dataType: 'json',
+      timeout: 15000
     })
-    .then((response) => {
-      debugLog(`✅ Resposta recebida: ${response.length} itens`);
-      debugLog(`📊 Tipo: ${response[0].tipoConteudo}`);
+    .done(function(response) {
+      processarRespostaSamsung(response, idAgendamentoPrioritario);
+    })
+    .fail(function(xhr, status, error) {
+      debugLog(`ERRO AJAX Final: ${status} - ${error}`);
+      debugLog(`Status: ${xhr.status}`);
+    });
+  }
 
-      if(idAgendamentoPrioritario != response[0].idAgendamentoPrioritario){
+  // PROCESSA RESPOSTA COM CACHE BLOB + FALLBACKS
+  function processarRespostaSamsung(response, idAgendamentoPrioritario) {
+    debugLog(`Resposta recebida: ${response.length} itens`);
+    debugLog(`Tipo: ${response[0].tipoConteudo}`);
+
+    if(idAgendamentoPrioritario != response[0].idAgendamentoPrioritario){
         console.log("Mudando agendamento: "+ idAgendamentoPrioritario);
         debugLog(`🔄 Mudando agendamento: ${idAgendamentoPrioritario} → ${response[0].idAgendamentoPrioritario}`);
 
@@ -654,7 +799,10 @@
           $('.video-container').addClass('d-none');
           $('.image-container').removeClass('d-block');
           $('.image-container').addClass('d-none');
+          $('.oferta-container').addClass('d-none');
+          $('.oferta-container').removeClass('d-flex');
           console.log("**** Carregando tabela ******");
+          debugLog(response[0]);
           inicializarRolagemProdutos(response);
         } else if (response[0].tipoConteudo === 2) {
           const videoUrl = response[0].caminhoImagemVideo;
@@ -665,28 +813,14 @@
           $('.image-container').addClass('d-none');
           $('.tabela-preco').removeClass('d-block');
           $('.tabela-preco').addClass('d-none');
+          $('.oferta-container').addClass('d-none');
+          $('.oferta-container').removeClass('d-flex');
           debugLog(`📋 Carregando video`);
           console.log("**** Carregando video ******");
           debugLog(response[0].caminhoImagemVideo);
           console.log("SRC = " + response[0].caminhoImagemVideo);
-          if (videoCache[videoUrl]) {
-            $('#sourceVideo').attr('src', videoCache[videoUrl]);
-            $('#video')[0].load();
-            $('#video')[0].play();
-            return;
-          }else {
-            fetch(videoUrl)
-                    .then(res => res.blob())
-                    .then(blob => {
-                      const objectURL = URL.createObjectURL(blob);
-                      videoCache[videoUrl] = objectURL;
-                      $('#sourceVideo').attr('src', objectURL);
-                      $('#video')[0].load();
-                      $('#video')[0].play();
-                    })
-                    .catch(err => console.error('Erro ao carregar vídeo:', err));
-          }
-        } else {
+          carregarVideoComCacheSamsung(videoUrl);
+        } else if (response[0].tipoConteudo === 1) {
           debugLog(`📋 Carregando imagem`);
           $('.image-container').addClass('d-block');
           $('.image-container').removeClass('d-none');
@@ -694,29 +828,164 @@
           $('.video-container').addClass('d-none');
           $('.tabela-preco').removeClass('d-block');
           $('.tabela-preco').addClass('d-none');
+          $('.oferta-container').addClass('d-none');
+          $('.oferta-container').removeClass('d-flex');
           console.log("**** Carregando imagem ******");
           debugLog("SRC = " + response[0].caminhoImagemVideo);
           console.log("SRC = " + response[0].caminhoImagemVideo);
           $('#imagem').attr('src', response[0].caminhoImagemVideo);
+        } else {
+          $('.oferta-container').addClass('d-flex');
+          $('.oferta-container').removeClass('d-none');
+          $('.image-container').addClass('d-none');
+          $('.image-container').removeClass('d-block');
+          $('.video-container').removeClass('d-block');
+          $('.video-container').addClass('d-none');
+          $('.tabela-preco').removeClass('d-block');
+          $('.tabela-preco').addClass('d-none');
+          adicionarOferta(response[0]);
         }
       }else{
-        TV_CONFIG.repeticaoPreco++;
+      TV_CONFIG.repeticaoPreco++;
+    }
+    debugLog(`Repetição: ${TV_CONFIG.repeticaoPreco}`);
+    console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
+  }
+  // CARREGA VÍDEO COM CACHE BLOB + FALLBACKS
+  function carregarVideoComCacheSamsung(videoUrl) {
+    debugLog(`SAMSUNG: Carregando vídeo com cache`);
+
+    // Se já está em cache, usa
+    if (videoCache[videoUrl]) {
+      $('#sourceVideo').attr('src', videoCache[videoUrl]);
+      $('#video')[0].load();
+      tentarPlaySamsung($('#video')[0], 'CACHE');
+      return;
+    }
+
+    // Tenta baixar para cache
+    debugLog(`SAMSUNG: Forçando donwload para cache`);
+
+    // TENTATIVA 1: XMLHttpRequest para blob
+    const xhrVideo = new XMLHttpRequest();
+    xhrVideo.open('GET', videoUrl, true);
+    xhrVideo.responseType = 'blob';
+    xhrVideo.timeout = 30000; // 30s para vídeo
+
+    xhrVideo.onload = function() {
+      if (xhrVideo.status === 200) {
+        try {
+          const blob = xhrVideo.response;
+          const objectURL = URL.createObjectURL(blob);
+          videoCache[videoUrl] = objectURL;
+          debugLog(`SAMSUNG: Cache criado - ${blob.size} bytes`);
+
+          $('#sourceVideo').attr('src', objectURL);
+          $('#video')[0].load();
+          tentarPlaySamsung($('#video')[0], 'CACHE');
+        } catch (e) {
+          debugLog(`SAMSUNG: Erro ao criar blob: ${e.message}`);
+          // FALLBACK: URL direta
+          carregarVideoSemCacheSamsung(videoUrl);
+        }
+      } else {
+        debugLog(`SAMSUNG: Erro no download: ${xhrVideo.status}`);
+        // FALLBACK: URL direta
+        carregarVideoSemCacheSamsung(videoUrl);
       }
-      debugLog(`🔂 Repetição: ${TV_CONFIG.repeticaoPreco}`);
-      console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
-    })
-    .catch((xhr, status, error) => {
-      debugLog(`❌ ERRO AJAX: ${status} - ${error}`);
-      debugLog(`📡 Status: ${xhr.status}`);
-    });
+    };
+
+    xhrVideo.onerror = function() {
+      debugLog(`SAMSUNG: Erro de rede no download`);
+      // FALLBACK: URL direta
+      carregarVideoSemCacheSamsung(videoUrl);
+    };
+
+    xhrVideo.ontimeout = function() {
+      debugLog(`SAMSUNG: Timeout no download`);
+      // FALLBACK: URL direta
+      carregarVideoSemCacheSamsung(videoUrl);
+    };
+    xhrVideo.send();
   }
 
-  /*const videoListener = document.getElementById('video');
-  videoListener.addEventListener('ended', () => {
-    const novoVideo = videoListener.cloneNode(true);
-    videoListener.parentNode.replaceChild(novoVideo, videoListener);
-    novoVideo.play();
-  });*/
+  // FALLBACK: Carrega vídeo sem cache (URL direta)
+  function carregarVideoSemCacheSamsung(videoUrl) {
+    debugLog(`SAMSUNG: Carregando vídeo direto (sem cache)`);
+    $('#sourceVideo').attr('src', videoUrl);
+    $('#video')[0].load();
+    tentarPlaySamsung($('#video')[0], 'DIRETO');
+  }
+
+  // SISTEMA ROBUSTO DE PLAY PARA SAMSUNG
+  function tentarPlaySamsung(video, modo) {
+    let tentativas = 0;
+    const maxTentativas = 8;
+    let videoCarregado = false;
+
+    const tentarPlay = () => {
+      if (tentativas >= maxTentativas || videoCarregado) {
+        if (tentativas >= maxTentativas) {
+          debugLog(`SAMSUNG ${modo}: Falha após ${maxTentativas} tentativas`);
+
+          // Se era cache e falhou, tenta modo direto
+          if (modo === 'CACHE') {
+            debugLog(`SAMSUNG: Cache falhou, tentando modo direto`);
+            // Aqui você implementaria fallback para URL original
+          }
+        }
+        return;
+      }
+
+      tentativas++;
+      debugLog(`SAMSUNG ${modo}: Tentativa de play #${tentativas}`);
+
+      // Força configurações
+      video.preload = true;
+      video.muted = true;
+      video.autoplay = true;
+      video.loop = true;
+
+      try {
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise
+                  .then(() => {
+                    debugLog(`SAMSUNG ${modo}: Play OK na tentativa ${tentativas}`);
+                    videoCarregado = true;
+                  })
+                  .catch(error => {
+                    debugLog(`SAMSUNG ${modo}: Tentativa ${tentativas} falhou: ${error.message}`);
+                    if (tentativas < maxTentativas) {
+                      setTimeout(tentarPlay, tentativas * 500);
+                    }
+                  });
+        } else {
+          debugLog(`SAMSUNG ${modo}: Play executado (sem promise)`);
+          videoCarregado = true;
+        }
+      } catch (e) {
+        debugLog(`SAMSUNG ${modo}: Erro no play: ${e.message}`);
+        if (tentativas < maxTentativas) {
+          setTimeout(tentarPlay, tentativas * 500);
+        }
+      }
+    };
+
+    // Event listeners
+    video.addEventListener('canplay', () => {
+      if (!videoCarregado) setTimeout(tentarPlay, 200);
+    });
+    video.addEventListener('playing', () => {
+      videoCarregado = true;
+      debugLog(`SAMSUNG ${modo}: Reproduzindo`);
+    });
+    video.addEventListener('error', (e) => {
+      debugLog(`SAMSUNG ${modo}: Erro no vídeo`);
+    });
+    // Primeira tentativa
+    setTimeout(tentarPlay, 1000);
+  }
 
   // === INICIALIZAÇÃO ===
   document.addEventListener("DOMContentLoaded", function () {
@@ -792,9 +1061,9 @@
       const timestamp = new Date().toLocaleTimeString();
       debugOverlay.innerHTML += `<div>[${timestamp}] ${message}</div>`;
 
-      // Limita a 10 últimas mensagens
+      // Limita a 30 últimas mensagens
       const lines = debugOverlay.querySelectorAll('div');
-      if (lines.length > 10) {
+      if (lines.length > 30) {
         lines[0].remove();
       }
     }
