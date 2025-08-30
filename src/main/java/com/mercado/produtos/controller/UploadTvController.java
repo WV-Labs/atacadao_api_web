@@ -23,7 +23,7 @@ import java.util.UUID;
 @CrossOrigin(origins = "*")
 public class UploadTvController {
 
-    @Value("${app.upload.dir:src/main/resources/static/img/uploads}")
+    @Value("${api-tv.upload.dir}")
     private String uploadDir;
 
     @Value("${server.servlet.context-path:/api-tv}")

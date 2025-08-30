@@ -1,5 +1,6 @@
 package com.mercado.produtos.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +15,10 @@ import java.nio.file.Paths;
 
 @RestController
 public class MediaController {
+    @Value("${api-tv.diretorio.imagens}")
+    private String diretorioImagens;
+    @Value("${api-tv.upload.dir}")
+    private String diretorioUpload;
 
     // ENDPOINT PARA SERVIR TODOS OS ARQUIVOS EM /img/uploads/
     @GetMapping("/img/uploads/{filename:.+}")
@@ -25,8 +30,7 @@ public class MediaController {
             String[] possibleBasePaths = {
                     "uploads",                    // ./uploads/
                     "img/uploads",               // ./img/uploads/
-                    "src/main/resources/static/uploads",
-                    "src/main/resources/static/img/uploads",
+                    diretorioUpload,
                     "target/classes/static/uploads",
                     "target/classes/static/img/uploads"
             };
@@ -133,8 +137,7 @@ public class MediaController {
         String[] directories = {
                 "uploads",
                 "img/uploads",
-                "src/main/resources/static/uploads",
-                "src/main/resources/static/img/uploads",
+                diretorioUpload,
                 "target/classes/static/uploads",
                 "target/classes/static/img/uploads"
         };

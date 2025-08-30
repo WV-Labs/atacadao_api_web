@@ -122,6 +122,14 @@
       border: 2px solid #28a745;
     }
 
+    #pixel {
+      position: fixed; left: 0; top: 0; width: 1px; height: 1px;
+      background: rgba(255,255,255,0.01);
+      pointer-events: none; z-index: 999999;
+      animation: nudge 15s steps(1) infinite alternate;
+      transform: translateX(0);
+      display: none;
+    }
 
     .oferta-container {
       justify-content: center;
@@ -719,7 +727,11 @@
     let idAgendamentoPrioritario = $('#idAgendamentoPrioritario').val();
     if(TV_CONFIG.tipoConteudo==3 && TV_CONFIG.repeticaoPreco >= 2 ){
       idAgendamentoPrioritario=0;
-      debugLog(`🔄 Reset ID por repetição: ${idAgendamentoPrioritario} e ${TV_CONFIG.repeticaoPreco}`);
+      debugLog(`🔄 Reset ID por repetição para Tabela de preço : ${idAgendamentoPrioritario} e ${TV_CONFIG.repeticaoPreco}`);
+    }
+    if(TV_CONFIG.tipoConteudo==2 && TV_CONFIG.repeticaoPreco >= 119 ){
+      idAgendamentoPrioritario=0;
+      debugLog(`🔄 Reset ID por repetição para Vídeo: ${idAgendamentoPrioritario} e ${TV_CONFIG.repeticaoPreco}`);
     }
     debugLog(`🔍 Verificando Agendamento. ID: ${idAgendamentoPrioritario}`);
     const server = getServerURL();
@@ -1027,13 +1039,55 @@
 <script th:src="@{/img/js/bootstrap.min.js}"></script>
 <script th:src="@{/img/js/jquery-3.7.1.min.js}"></script>
 <button id="exitFullscreenBtn" style="position:fixed;top:10px;right:10px;width:40px;height:40px;opacity:0;z-index:999;border:none;background:none;cursor:pointer;"></button>
+<button id="btnKA" style="position:fixed;top:10px;left:10px;width:40px;height:40px;opacity:0;z-index:999;border:none;background:none;cursor:pointer;"></button>
+<span id="status" style="display: block"></span>
+<div id="pixel"></div>
 <script>
+
+  let kaOn = false;
+  let timers = [];
+  function startKeepAlive() {
+    if (kaOn) return;
+    kaOn = true;
+
+    // 1) Ativa o pixel de repaint
+    $("#pixel").style.display = "block";
+
+    // 2) Heartbeat leve por JS: força pequenos repaints c/ setInterval
+    let flip = false;
+    timers.push(setInterval(() => {
+      flip = !flip;
+      $("#pixel").style.opacity = flip ? "0.011" : "0.012";
+      document.documentElement.style.setProperty("--tick", String(Date.now()%1e6));
+      log("Heartbeat repaint.");
+    }, 30000));
+
+    log("Keep-alive ativado.");
+    $("#status").textContent = "Keep-alive ON";
+  }
+
+  function stopKeepAlive() {
+    $("#pixel").style.display = "none";
+    timers.forEach(clearInterval);
+    timers = [];
+    kaOn = false;
+    $("#status").textContent = "Keep-alive OFF";
+    log("Keep-alive desativado.");
+  }
+
+  document.getElementById("btnKA").addEventListener("click", (e) => {
+
+  });
+
     document.getElementById("exitFullscreenBtn").addEventListener("click", function () {
-        if (document.fullscreenElement) {
+
+      if (document.fullscreenElement) {
             document.exitFullscreen();
         }else{
           document.documentElement.requestFullscreen();
         }
+      if (!kaOn) { startKeepAlive(); e.target.textContent = "Desativar keep-alive"; }
+      else { stopKeepAlive(); e.target.textContent = "Ativar keep-alive"; }
     });
     function criarDebugOverlay() {
       const debugDiv = document.createElement('div');

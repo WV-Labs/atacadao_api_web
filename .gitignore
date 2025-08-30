@@ -32,26 +32,17 @@ build/
 ### VS Code ###
 .vscode/
 !/logs/
-!/local-repo/
 !/.mvn/
 !/.idea/
 !/target/
 !/scripts/
 !/.idea/
-
 !/.mvn/
-
-!/local-repo/
-
 !/logs/
-
 !/out/
 !/BACKUP.MD
-
 !/ESTRUTURA_DISTRIBUICAO.MD
-
 !/HOW_TO_DO.md
-
 !/INSTALL-OFFLINE.MD
 /.idea/checkstyle-idea.xml
 /.idea/compiler.xml
@@ -64,7 +55,6 @@ build/
 /.idea/shelf/Changes/shelved.patch
 /.idea/workspace.xml
 !/src/main/resources/static/
-!/local-repo/
 !/.idea/
 /target/
 /src/main/resources/static/img/

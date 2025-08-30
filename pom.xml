@@ -100,7 +100,7 @@
     <repositories>
         <repository>
             <id>local-repo</id>
-            <url>file://C:/Users/Junior/Documents/_Cliente_e_Consultorias/atacadao/projeto-produtoDtos/local-repo</url>
+            <url>file://C:/Users/Junior/Documents/_Cliente_e_Consultorias/atacadao/git/wayvis/api-tv/local-repo</url>
         </repository>
     </repositories>
 </project>
