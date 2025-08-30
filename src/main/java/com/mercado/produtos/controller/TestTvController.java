@@ -19,7 +19,7 @@ public class TestTvController {
     @Value("${server.servlet.context-path:/api-tv}")
     private String contextPath;
 
-    @Value("${app.upload.dir:src/main/resources/static/img/uploads}")
+    @Value("${api-tv.upload.dir}")
     private String uploadDir;
 
     @GetMapping("/health")
