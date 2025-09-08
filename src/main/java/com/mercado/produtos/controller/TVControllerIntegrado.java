@@ -42,6 +42,8 @@ public class TVControllerIntegrado {
     private String uploadDir;
     @Value("${api-tv.debugDisplay}")
     private String debugDisplay;
+    @Value("${api-tv.timeoutTV}")
+    private int timeoutTV;
 
     @GetMapping("/")
     public String index(Model model) {
@@ -58,6 +60,7 @@ public class TVControllerIntegrado {
         model.addAttribute("baseUrl", baseUrl);
         model.addAttribute("serverIP", serverIP);
         model.addAttribute("debugDisplay", debugDisplay);
+        model.addAttribute("timeoutTV", timeoutTV);
         model.addAttribute("qtdeLinhas", qtdeLinhas);
         return "tv-sistema";
     }
@@ -132,6 +135,7 @@ public class TVControllerIntegrado {
         model.addAttribute("baseUrl", baseUrl);
         model.addAttribute("serverIP", serverIP);
         model.addAttribute("debugDisplay", debugDisplay);
+        model.addAttribute("timeoutTV", timeoutTV);
         model.addAttribute("categoria", categoria);
         model.addAttribute("numero", numero);
         model.addAttribute("qtdeLinhas", qtdeLinhas);

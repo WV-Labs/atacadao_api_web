@@ -31,6 +31,7 @@
     }
 
     .video-container,
+    .video-containerLG,
     .image-container {
       width: 100vw;
       height: 100vh;
@@ -320,12 +321,15 @@
 
   <!-- Video -->
   <div class="video-container" th:id="divVideo" th:align="center">
-    <video id="video" controls playsinline autoplay muted preload="auto" loop>
+    <video id="video" playsinline webkit-playsinline autoplay muted preload="auto" loop>
       <source id="sourceVideo" type="video/mp4">
     </video>
     <input type="hidden" id="videoCaminho" />
   </div>
-
+  <div class="video-containerLG" th:id="divVideoLG" th:align="center">
+    <video id="videoLG" playsinline webkit-playsinline autoplay muted preload="auto" loop></video>
+    <input type="hidden" id="videoCaminhoLG" />
+  </div>
   <div class="oferta-container" th:id="divOferta " th:align="center">
     <div class="oferta">
       <h2 class="">OFERTA</h2>
@@ -378,7 +382,8 @@
     caminhoArquivo: /*[[${caminhoCompletoArquivo}]]*/ '',
     repeticaoPreco: 0,
     serverIP: /*[[${serverIP}]]*/ 'localhost',
-    debugDisplay: /*[[${debugDisplay}]]*/ 'none'
+    debugDisplay: /*[[${debugDisplay}]]*/ 'none',
+    timeoutTV: /*[[${timeoutTV}]]*/ '30000'
   };
   function getServerURL() {
     const hostname = window.location.hostname;
@@ -411,6 +416,61 @@
   let contadorVerificacao = 30;
   let totalVerificacoes = 0;
   let totalErros = 0;
+
+  function detectSmartTVBrand({ waitForKey = false, timeout = 1500 } = {}) {
+    // 1) Feature detection (melhor sinal)
+    if (typeof window.tizen !== 'undefined' || typeof window.webapis !== 'undefined') return Promise.resolve('Samsung');
+    if (typeof window.webOS !== 'undefined' || typeof window.PalmSystem !== 'undefined' || typeof window.webOSSystem !== 'undefined') return Promise.resolve('LG');
+
+    // 2) userAgent / vendor (vários padrões)
+    const ua = (navigator.userAgent || '').toLowerCase();
+    const vendor = (navigator.vendor || '').toLowerCase();
+
+    // Samsung costuma ter "tizen" ou "samsungbrowser"
+    if (ua.includes('tizen') || ua.includes('samsungbrowser') || /samsung.*smarttv/i.test(ua) || vendor.includes('samsung')) {
+      return Promise.resolve('Samsung');
+    }
+
+    // LG (webOS às vezes aparece como "web0s" com zero, ou "webos", e histórico "netcast")
+    if (ua.includes('web0s') || ua.includes('webos') || ua.includes('netcast') || vendor.includes('lg')) {
+      return Promise.resolve('LG');
+    }
+
+    // 3) userAgentData (quando disponível)
+    if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+      return navigator.userAgentData.getHighEntropyValues(['platform','model'])
+              .then(info => {
+                const plat = (info.platform || '').toLowerCase();
+                const model = (info.model || '').toLowerCase();
+                if (plat.includes('tizen') || model.includes('samsung')) return 'Samsung';
+                if (plat.includes('webos') || model.includes('lg')) return 'LG';
+                return 'Unknown';
+              })
+              .catch(() => 'Unknown');
+    }
+
+    // 4) Fallback opcional por tecla (BACK é diferente nas TVs)
+    //    - Samsung (Tizen): keyCode 10009
+    //    - LG (webOS): keyCode 461 (VK_BACK)
+    if (!waitForKey) return Promise.resolve('Unknown');
+
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        window.removeEventListener('keydown', onKey);
+        resolve('Unknown');
+      }, timeout);
+
+      function onKey(e) {
+        clearTimeout(timer);
+        window.removeEventListener('keydown', onKey);
+        if (e && e.keyCode === 10009) return resolve('Samsung');
+        if (e && e.keyCode === 461)   return resolve('LG');
+        resolve('Unknown');
+      }
+
+      window.addEventListener('keydown', onKey, { once: true });
+    });
+  }
 
   function atualizarDebugInfo() {
     const debugElements = {
@@ -768,9 +828,84 @@
       // FALLBACK: tenta jQuery AJAX
       tentarAjaxFallback(url, idAgendamentoPrioritario);
     };
-    xhr.timeout = 15000;
+    xhr.timeout = TV_CONFIG.timeoutTV;
     xhr.open('GET', url, true);
     xhr.send();
+  }
+
+  function playOnLG(url) {
+    debugLog(`LG: preparando vídeo...`);
+    const v = document.getElementById('videoLG');
+    const container = document.querySelector('.video-containerLG');
+
+    // 1) Garante visibilidade real
+    container.classList.remove('d-none');
+    container.classList.add('d-block');
+
+    // 2) Reset total do elemento
+    try { v.pause(); } catch (_) {}
+    v.removeAttribute('src');
+    while (v.firstChild) v.removeChild(v.firstChild);
+
+    v.setAttribute('muted', '');
+    v.muted = true;
+    v.setAttribute('autoplay', '');
+    v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    // Se o MP4 vier de outro host com CORS liberado, pode ajudar:
+    // v.setAttribute('crossorigin', 'anonymous');
+
+    v.src = url;
+    v.load();
+
+    // === Diagnóstico útil ===
+    const diag = () => {
+      debugLog(`LG: readyState=${v.readyState} | networkState=${v.networkState}`);
+      if (v.error) debugLog(`LG: video.error code=${v.error.code}`);
+      try {
+        const b = v.buffered, ranges = [];
+        for (let i = 0; i < b.length; i++) ranges.push(`[${b.start(i).toFixed(2)}..${b.end(i).toFixed(2)}]`);
+        if (ranges.length) debugLog(`LG: buffered=${ranges.join(', ')}`);
+      } catch {}
+    };
+
+    v.addEventListener('error', () => { debugLog('LG: <video> error'); diag(); });
+    v.addEventListener('stalled', () => { debugLog('LG: stalled'); diag(); });
+    v.addEventListener('waiting', () => { debugLog('LG: waiting'); diag(); });
+    v.addEventListener('progress', () => { /* muito ruidoso, mas útil */ });
+
+    v.addEventListener('loadedmetadata', () => {
+      // Em algumas LGs ajuda “ancorar” o início e pedir play
+      try { v.currentTime = 0; } catch (_) {}
+      diag();
+    }, { once: true });
+
+    let attempts = 0;
+    const maxAttempts = 8;
+    const tryPlay = () => {
+      const cs = getComputedStyle(container);
+      if (cs.display === 'none') {
+        return requestAnimationFrame(() => setTimeout(tryPlay, 200));
+      }
+      attempts++;
+      debugLog(`LG: tentativa de play #${attempts}`);
+      const p = v.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          debugLog('LG: ▶️ Reproduzindo');
+          diag();
+        }).catch(err => {
+          debugLog(`LG: falhou (#${attempts}): ${err?.name || ''} ${err?.message || ''}`);
+          if (attempts < maxAttempts) setTimeout(tryPlay, attempts * 400);
+          else diag();
+        });
+      }
+    };
+
+    // Tenta após sinais de carregamento e também com fallback
+    v.addEventListener('canplay', () => tryPlay(), { once: true });
+    v.addEventListener('canplaythrough', () => tryPlay(), { once: true });
+    setTimeout(tryPlay, 1200);
   }
 
   // FALLBACK: jQuery AJAX (sua versão original)
@@ -780,7 +915,7 @@
       url: url,
       method: "GET",
       dataType: 'json',
-      timeout: 15000
+      timeout: TV_CONFIG.timeoutTV
     })
     .done(function(response) {
       processarRespostaSamsung(response, idAgendamentoPrioritario);
@@ -809,6 +944,8 @@
           $('.tabela-preco').removeClass('d-none');
           $('.video-container').removeClass('d-block');
           $('.video-container').addClass('d-none');
+          $('.video-containerLG').removeClass('d-block');
+          $('.video-containerLG').addClass('d-none');
           $('.image-container').removeClass('d-block');
           $('.image-container').addClass('d-none');
           $('.oferta-container').addClass('d-none');
@@ -818,9 +955,49 @@
           inicializarRolagemProdutos(response);
         } else if (response[0].tipoConteudo === 2) {
           const videoUrl = response[0].caminhoImagemVideo;
+          detectSmartTVBrand({ waitForKey: true, timeout: 2000 }).then(brand => {
+            debugLog(`TV detectada:, ${brand}`); // 'Samsung' | 'LG' | 'Unknown'
 
-          $('.video-container').addClass('d-block');
-          $('.video-container').removeClass('d-none');
+            // esconda tudo que NÃO é vídeo antes
+            $('.image-container').removeClass('d-block').addClass('d-none');
+            $('.tabela-preco').removeClass('d-block').addClass('d-none');
+            $('.oferta-container').removeClass('d-flex').addClass('d-none');
+
+            debugLog(`📋 Carregando video ...`);
+            if (brand === 'Samsung') {
+              debugLog(`📋 Container SAMSUNG`);
+              $('.video-container').addClass('d-block').removeClass('d-none');
+              $('.video-containerLG').removeClass('d-block').addClass('d-none');
+
+              carregarVideoComCacheSamsung(videoUrl);
+            } else {
+              debugLog(`📋 Container LG/Unknown`);
+              $('.video-containerLG').addClass('d-block').removeClass('d-none');
+              $('.video-container').removeClass('d-block').addClass('d-none');
+
+              playOnLG(videoUrl); // sua função já está no arquivo
+            }
+          })
+          .catch((err) => {
+            debugLog(`Falha na detecção da TV: ${err?.message || err}`);
+            // fallback seguro: trata como LG
+            $('.image-container').removeClass('d-block').addClass('d-none');
+            $('.tabela-preco').removeClass('d-block').addClass('d-none');
+            $('.oferta-container').removeClass('d-flex').addClass('d-none');
+            $('.video-container').removeClass('d-block').addClass('d-none');
+            $('.video-containerLG').addClass('d-block').removeClass('d-none');
+            debugLog(`📋 Container LG/Unknown`);
+            playOnLG(videoUrl);
+          });
+          /*if(brand ==='Samsung') {
+            debugLog(`📋 Containner SAMSUNG`);
+            $('.video-container').addClass('d-block');
+            $('.video-container').removeClass('d-none');
+          }else {
+            debugLog(`📋 Containner LG`);
+            $('.video-containerLG').addClass('d-block');
+            $('.video-containerLG').removeClass('d-none');
+          }
           $('.image-container').removeClass('d-block');
           $('.image-container').addClass('d-none');
           $('.tabela-preco').removeClass('d-block');
@@ -831,13 +1008,22 @@
           console.log("**** Carregando video ******");
           debugLog(response[0].caminhoImagemVideo);
           console.log("SRC = " + response[0].caminhoImagemVideo);
-          carregarVideoComCacheSamsung(videoUrl);
+          debugLog('Carregando vídeo ...');
+
+          // Exemplo de uso:
+          if(brand ==='Samsung') {
+            carregarVideoComCacheSamsung(videoUrl);
+          }else{
+            playOnLG(videoUrl);
+          }*/
         } else if (response[0].tipoConteudo === 1) {
           debugLog(`📋 Carregando imagem`);
           $('.image-container').addClass('d-block');
           $('.image-container').removeClass('d-none');
           $('.video-container').removeClass('d-block');
           $('.video-container').addClass('d-none');
+          $('.video-containerLG').removeClass('d-block');
+          $('.video-containerLG').addClass('d-none');
           $('.tabela-preco').removeClass('d-block');
           $('.tabela-preco').addClass('d-none');
           $('.oferta-container').addClass('d-none');
@@ -853,6 +1039,8 @@
           $('.image-container').removeClass('d-block');
           $('.video-container').removeClass('d-block');
           $('.video-container').addClass('d-none');
+          $('.video-containerLG').removeClass('d-block');
+          $('.video-containerLG').addClass('d-none');
           $('.tabela-preco').removeClass('d-block');
           $('.tabela-preco').addClass('d-none');
           adicionarOferta(response[0]);
@@ -863,8 +1051,10 @@
     debugLog(`Repetição: ${TV_CONFIG.repeticaoPreco}`);
     console.log("Repetição = " + TV_CONFIG.repeticaoPreco);
   }
+
   // CARREGA VÍDEO COM CACHE BLOB + FALLBACKS
   function carregarVideoComCacheSamsung(videoUrl) {
+    debugLog(`Tratando vídeo para executar na TV SAMSUNG`);
     debugLog(`SAMSUNG: Carregando vídeo com cache`);
 
     // Se já está em cache, usa
@@ -882,7 +1072,7 @@
     const xhrVideo = new XMLHttpRequest();
     xhrVideo.open('GET', videoUrl, true);
     xhrVideo.responseType = 'blob';
-    xhrVideo.timeout = 30000; // 30s para vídeo
+    xhrVideo.timeout = TV_CONFIG.timeoutTV; // 2min para vídeo
 
     xhrVideo.onload = function() {
       if (xhrVideo.status === 200) {
