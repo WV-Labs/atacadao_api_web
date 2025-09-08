@@ -716,6 +716,117 @@
          </div>
     </div>`;
   }
+  // === LG: Carregar com cache (blob -> objectURL) ===
+  function carregarVideoComCacheLG(videoUrl) {
+    debugLog(`LG: Carregando vídeo com cache`);
+
+    // 1) Se já está em cache, usa imediatamente
+    if (videoCache[videoUrl]) {
+      iniciarPlayLGComSrc(videoCache[videoUrl], 'CACHE');
+      return;
+    }
+
+    // 2) Tenta baixar para blob (funciona se o servidor permitir CORS/Range)
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', videoUrl, true);
+    xhr.responseType = 'blob';
+    xhr.timeout = TV_CONFIG.timeoutTV; // mesmo timeout usado no Samsung
+
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        try {
+          const blob = xhr.response;
+          const objectURL = URL.createObjectURL(blob);
+          videoCache[videoUrl] = objectURL;  // guarda em cache em memória
+          debugLog(`LG: Cache criado - ${blob.size} bytes`);
+          iniciarPlayLGComSrc(objectURL, 'CACHE');
+        } catch (e) {
+          debugLog(`LG: Erro ao criar blob: ${e.message}`);
+          iniciarPlayLGComSrc(videoUrl, 'DIRETO');
+        }
+      } else {
+        debugLog(`LG: Erro no download: HTTP ${xhr.status}`);
+        iniciarPlayLGComSrc(videoUrl, 'DIRETO');
+      }
+    };
+
+    xhr.onerror = function () {
+      debugLog(`LG: Erro de rede no download`);
+      iniciarPlayLGComSrc(videoUrl, 'DIRETO');
+    };
+
+    xhr.ontimeout = function () {
+      debugLog(`LG: Timeout no download`);
+      iniciarPlayLGComSrc(videoUrl, 'DIRETO');
+    };
+
+    xhr.send();
+  }
+
+  // Helper: reproduz no <video id="videoLG"> com src informado (CACHE/DIRETO)
+  function iniciarPlayLGComSrc(src, modo) {
+    const v = document.getElementById('videoLG');
+    const container = document.querySelector('.video-containerLG');
+
+    // Garante visibilidade
+    container.classList.remove('d-none');
+    container.classList.add('d-block');
+
+    // Reset do elemento
+    try { v.pause(); } catch (_) {}
+    v.removeAttribute('src');
+    while (v.firstChild) v.removeChild(v.firstChild);
+
+    v.setAttribute('muted', ''); v.muted = true;
+    v.setAttribute('autoplay', '');
+    v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    // Se o vídeo vier de outro host COM CORS permitido, pode ajudar:
+    // v.setAttribute('crossorigin','anonymous');
+
+    // Define a fonte
+    v.src = src;
+    v.load();
+
+    // Diagnóstico
+    const diag = () => {
+      debugLog(`LG ${modo}: readyState=${v.readyState} | networkState=${v.networkState}`);
+      if (v.error) debugLog(`LG ${modo}: video.error code=${v.error.code}`);
+      try {
+        const b = v.buffered, ranges = [];
+        for (let i = 0; i < b.length; i++) ranges.push(`[${b.start(i).toFixed(2)}..${b.end(i).toFixed(2)}]`);
+        if (ranges.length) debugLog(`LG ${modo}: buffered=${ranges.join(', ')}`);
+      } catch {}
+    };
+
+    v.addEventListener('error', () => { debugLog(`LG ${modo}: <video> error`); diag(); });
+    v.addEventListener('stalled', () => { debugLog(`LG ${modo}: stalled`); diag(); });
+    v.addEventListener('waiting', () => { debugLog(`LG ${modo}: waiting`); diag(); });
+    v.addEventListener('loadedmetadata', () => { try { v.currentTime = 0; } catch(_){} diag(); }, { once: true });
+
+    // Tentativas com backoff
+    let attempts = 0;
+    const maxAttempts = 8;
+    const tryPlay = () => {
+      const cs = getComputedStyle(container);
+      if (cs.display === 'none') return requestAnimationFrame(() => setTimeout(tryPlay, 200));
+
+      attempts++;
+      debugLog(`LG ${modo}: tentativa de play #${attempts}`);
+      const p = v.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => { debugLog(`LG ${modo}: ▶️ Reproduzindo`); diag(); })
+                .catch(err => {
+                  debugLog(`LG ${modo}: falhou (#${attempts}): ${err?.name||''} ${err?.message||''}`);
+                  if (attempts < maxAttempts) setTimeout(tryPlay, attempts * 400); else diag();
+                });
+      }
+    };
+
+    v.addEventListener('canplay', () => tryPlay(), { once: true });
+    v.addEventListener('canplaythrough', () => tryPlay(), { once: true });
+    setTimeout(tryPlay, 1200);
+  }
 
   // === ROLAGEM DE PRODUTOS COM FADE ===
   function inicializarRolagemProdutos(produtos) {
@@ -805,7 +916,7 @@
         if (xhr.status === 200) {
           try {
             const response = JSON.parse(xhr.responseText);
-            processarRespostaSamsung(response, idAgendamentoPrioritario);
+            processarResposta(response, idAgendamentoPrioritario);
           } catch (e) {
             debugLog(`Erro ao parsear JSON: ${e.message}`);
             // FALLBACK: tenta jQuery AJAX
@@ -918,7 +1029,7 @@
       timeout: TV_CONFIG.timeoutTV
     })
     .done(function(response) {
-      processarRespostaSamsung(response, idAgendamentoPrioritario);
+      processarResposta(response, idAgendamentoPrioritario);
     })
     .fail(function(xhr, status, error) {
       debugLog(`ERRO AJAX Final: ${status} - ${error}`);
@@ -927,7 +1038,7 @@
   }
 
   // PROCESSA RESPOSTA COM CACHE BLOB + FALLBACKS
-  function processarRespostaSamsung(response, idAgendamentoPrioritario) {
+  function processarResposta(response, idAgendamentoPrioritario) {
     debugLog(`Resposta recebida: ${response.length} itens`);
     debugLog(`Tipo: ${response[0].tipoConteudo}`);
 
@@ -975,7 +1086,8 @@
               $('.video-containerLG').addClass('d-block').removeClass('d-none');
               $('.video-container').removeClass('d-block').addClass('d-none');
 
-              playOnLG(videoUrl); // sua função já está no arquivo
+              carregarVideoComCacheLG(videoUrl); // cache
+              //playOnLG(videoUrl);
             }
           })
           .catch((err) => {
@@ -987,35 +1099,9 @@
             $('.video-container').removeClass('d-block').addClass('d-none');
             $('.video-containerLG').addClass('d-block').removeClass('d-none');
             debugLog(`📋 Container LG/Unknown`);
-            playOnLG(videoUrl);
+            carregarVideoComCacheLG(videoUrl); // cache
+            //playOnLG(videoUrl);
           });
-          /*if(brand ==='Samsung') {
-            debugLog(`📋 Containner SAMSUNG`);
-            $('.video-container').addClass('d-block');
-            $('.video-container').removeClass('d-none');
-          }else {
-            debugLog(`📋 Containner LG`);
-            $('.video-containerLG').addClass('d-block');
-            $('.video-containerLG').removeClass('d-none');
-          }
-          $('.image-container').removeClass('d-block');
-          $('.image-container').addClass('d-none');
-          $('.tabela-preco').removeClass('d-block');
-          $('.tabela-preco').addClass('d-none');
-          $('.oferta-container').addClass('d-none');
-          $('.oferta-container').removeClass('d-flex');
-          debugLog(`📋 Carregando video`);
-          console.log("**** Carregando video ******");
-          debugLog(response[0].caminhoImagemVideo);
-          console.log("SRC = " + response[0].caminhoImagemVideo);
-          debugLog('Carregando vídeo ...');
-
-          // Exemplo de uso:
-          if(brand ==='Samsung') {
-            carregarVideoComCacheSamsung(videoUrl);
-          }else{
-            playOnLG(videoUrl);
-          }*/
         } else if (response[0].tipoConteudo === 1) {
           debugLog(`📋 Carregando imagem`);
           $('.image-container').addClass('d-block');
